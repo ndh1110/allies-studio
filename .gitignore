@@ -1,0 +1,48 @@
+# ------------------------------------
+# Global Ignore (D:\DALTM)
+# ------------------------------------
+
+# Thư mục Node modules (Frontend)
+**/node_modules/
+
+# Thư mục biên dịch Java (Backend)
+**/target/
+
+# Log files
+*.log
+log/
+tmp/
+
+# Cấu hình IDE (Ví dụ: IntelliJ/VS Code)
+.idea/
+.vscode/
+
+# ------------------------------------
+# Backend Specific (allies_backend)
+# ------------------------------------
+# Java compiled output
+*.class
+
+# Maven
+.mvn/
+pom.xml.tag
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+build/
+
+# Spring Boot
+# Cần phải ignore nếu chứa thông tin nhạy cảm
+# Mặc dù application.properties thường được giữ lại, 
+# nếu bạn sử dụng file properties riêng cho môi trường DEV/PROD
+# thì nên loại trừ (hoặc thay thế bằng biến môi trường)
+
+# ------------------------------------
+# Frontend Specific (allies_frontend)
+# ------------------------------------
+# Angular/TypeScript compiled output
+/dist/
+/out/
+# Cache
+.angular/

@@ -1,0 +1,48 @@
+# =============================================
+# CẤU HÌNH MẪU CHO ALLIES BACKEND
+# =============================================
+# Sao chép file này thành application.properties và cập nhật thông tin của bạn
+
+spring.application.name=allies-backend
+
+# ===============================
+# CẤU HÌNH SQL SERVER
+# ===============================
+# Cách 1: SQL Server Authentication (Khuyến nghị)
+spring.datasource.url=jdbc:sqlserver://GiaBaoNgoHoang\\SQLEXPRESS:1433;databaseName=allies_db;encrypt=false;trustServerCertificate=true
+spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+spring.datasource.username=sa
+spring.datasource.password=your_sa_password_here
+
+# Cách 2: Windows Authentication (Nếu có cấu hình đúng)
+# spring.datasource.url=jdbc:sqlserver://GiaBaoNgoHoang\\SQLEXPRESS:1433;databaseName=allies_db;integratedSecurity=true;encrypt=false;trustServerCertificate=true
+# spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+# spring.datasource.username=
+# spring.datasource.password=
+
+# ===============================
+# JPA / HIBERNATE
+# ===============================
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect
+spring.jpa.show-sql=true
+spring.jpa.open-in-view=false
+
+# ===============================
+# JWT CONFIG
+# ===============================
+connectsphere.app.jwtSecret=mySecretKey123456789012345678901234567890123456789012345678901234567890
+connectsphere.app.jwtExpirationMs=86400000
+
+# ===============================
+# WEBSOCKET CONFIG
+# ===============================
+spring.websocket.sockjs.enabled=true
+spring.websocket.sockjs.heartbeat-time=25000
+spring.websocket.sockjs.disconnect-delay=5000
+
+# ===============================
+# LOGGING CONFIG
+# ===============================
+logging.level.com.allies.app=DEBUG
+logging.level.org.springframework.web.socket=DEBUG

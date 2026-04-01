@@ -1,2 +1,8 @@
-# allies-studio
-A real-time web-based chat application built with Spring Boot and Angular. Focuses on safe, friendly, and seamless online communication.
+tải thu viện tự động
+backend :mvn install
+
+frontend :npm install
+
+mvnw spring-boot:run
+
+public ip bang ngrok : ngrok http 8080 -> lấy link thay vào envirement frontend
