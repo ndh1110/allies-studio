@@ -20,9 +20,6 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
-            "define": {
-              "global": "window"
-            },
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -46,18 +43,12 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all",
-              "define": {
-                "global": "window"
-              }
+              "outputHashing": "all"
             },
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true,
-              "define": {
-                "global": "window"
-              }
+              "sourceMap": true
             }
           },
           "defaultConfiguration": "production"

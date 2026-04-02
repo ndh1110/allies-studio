@@ -1,0 +1,165 @@
+<div class="bg-white rounded-2xl shadow p-6">
+  <h2 class="text-xl font-semibold text-gray-900 mb-4">Add Friends</h2>
+
+  <!-- Sub nav -->
+  <div class="flex gap-2 mb-4">
+    <button type="button"
+      class="px-3 py-2 rounded-md text-sm"
+      [class.bg-primary]="subTab() === 'search'"
+      [class.text-white]="subTab() === 'search'"
+      (click)="setSubTab('search')">
+      Tìm kiếm
+    </button>
+    <button type="button"
+      class="px-3 py-2 rounded-md text-sm"
+      [class.bg-primary]="subTab() === 'requests'"
+      [class.text-white]="subTab() === 'requests'"
+      (click)="setSubTab('requests')">
+      Lời mời kết bạn
+    </button>
+    <button type="button"
+      class="px-3 py-2 rounded-md text-sm"
+      [class.bg-primary]="subTab() === 'suggestions'"
+      [class.text-white]="subTab() === 'suggestions'"
+      (click)="setSubTab('suggestions')">
+      Gợi ý
+    </button>
+  </div>
+
+  <!-- SEARCH -->
+  @if (subTab() === 'search') {
+    <div class="space-y-3">
+      <div class="flex gap-2">
+        <input
+            [ngModel]="q()"                   
+            (ngModelChange)="q.set($event)"   
+            (keyup.enter)="onSearch()"
+            class="border rounded-md px-3 py-2 w-full"
+            placeholder="Search username or email..."
+            name="searchTerm"
+            />
+        <button type="button" class="px-4 py-2 rounded-md bg-primary text-white"
+                (click)="onSearch()" [disabled]="searching()">Search</button>
+      </div>
+
+      @if (searchError()) {
+        <div class="text-red-600 text-sm">{{ searchError() }}</div>
+      }
+      @if (searching()) {
+        <div class="text-gray-500 italic">Searching…</div>
+      } @else if (searchResults().length === 0) {
+        <div class="text-gray-500 italic">No results yet.</div>
+      } @else {
+        <ul class="divide-y">
+          @for (u of searchResults(); track u.id) {
+            <li class="py-3 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-primary/90 text-white rounded-full flex items-center justify-center">
+                  {{ u.initials ?? (u.username[0] || 'U') }}
+                </div>
+                <div>
+                  <div class="font-medium">{{ u.username }}</div>
+                  <div class="text-xs text-gray-500">{{ u.email }}</div>
+                </div>
+              </div>
+              <button type="button" class="px-3 py-1.5 bg-primary text-white rounded-md"
+                      (click)="sendRequest(u)">
+                Gửi lời mời
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <!-- REQUESTS -->
+  @if (subTab() === 'requests') {
+    @if (loadingReq()) {
+      <div class="text-gray-500 italic">Loading…</div>
+    } @else {
+      <div class="grid sm:grid-cols-2 gap-6">
+        <!-- Incoming -->
+        <div>
+          <h3 class="font-semibold mb-2">Đến (incoming)</h3>
+          @if (incoming().length === 0) {
+            <div class="text-gray-500 text-sm">Chưa có lời mời.</div>
+          } @else {
+            <ul class="divide-y">
+              @for (r of incoming(); track r.id) {
+                <li class="py-3 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-primary/90 text-white rounded-full flex items-center justify-center">
+                      {{ r.fromUser.initials ?? (r.fromUser.username[0] || 'U') }}
+                    </div>
+                    <div>
+                      <div class="font-medium">{{ r.fromUser.username }}</div>
+                      <div class="text-xs text-gray-500">{{ r.createdAt | date:'short' }}</div>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="px-3 py-1.5 bg-primary text-white rounded-md" (click)="accept(r)">Chấp nhận</button>
+                    <button class="px-3 py-1.5 bg-gray-200 rounded-md" (click)="decline(r)">Từ chối</button>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        <!-- Outgoing -->
+        <div>
+          <h3 class="font-semibold mb-2">Đã gửi (outgoing)</h3>
+          @if (outgoing().length === 0) {
+            <div class="text-gray-500 text-sm">Chưa gửi lời mời nào.</div>
+          } @else {
+            <ul class="divide-y">
+              @for (r of outgoing(); track r.id) {
+                <li class="py-3 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-primary/90 text-white rounded-full flex items-center justify-center">
+                      {{ r.toUser.initials ?? (r.toUser.username[0] || 'U') }}
+                    </div>
+                    <div>
+                      <div class="font-medium">{{ r.toUser.username }}</div>
+                      <div class="text-xs text-gray-500">Trạng thái: {{ r.status }}</div>
+                    </div>
+                  </div>
+                  <button class="px-3 py-1.5 bg-gray-200 rounded-md" (click)="cancel(r)">Hủy</button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- SUGGESTIONS -->
+  @if (subTab() === 'suggestions') {
+    @if (loadingSug()) {
+      <div class="text-gray-500 italic">Loading…</div>
+    } @else if (suggestions().length === 0) {
+      <div class="text-gray-500">Chưa có gợi ý.</div>
+    } @else {
+      <ul class="divide-y">
+        @for (u of suggestions(); track u.id) {
+          <li class="py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-primary/90 text-white rounded-full flex items-center justify-center">
+                {{ u.initials ?? (u.username[0] || 'U') }}
+              </div>
+              <div>
+                <div class="font-medium">{{ u.username }}</div>
+                <div class="text-xs text-gray-500">{{ u.mutualCount || 0 }} bạn chung</div>
+              </div>
+            </div>
+            <button class="px-3 py-1.5 bg-primary text-white rounded-md" (click)="addFromSuggestion(u)">
+              Kết bạn
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</div>

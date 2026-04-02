@@ -424,7 +424,7 @@ export class VideoCallComponent implements OnInit, OnDestroy {
     if (!currentUser) return;
 
     const callData: CallData = {
-      callerId: currentUser.tenDn, // Fix: use tenDn instead of username
+      callerId: currentUser.username,
       receiverId: 'receiver', // This should come from the selected chat
       callType: 'video'
     };
@@ -438,7 +438,7 @@ export class VideoCallComponent implements OnInit, OnDestroy {
     if (!currentUser) return;
 
     const callData: CallData = {
-      callerId: currentUser.tenDn, // Fix: use tenDn instead of username
+      callerId: currentUser.username,
       receiverId: 'receiver', // This should come from the selected chat
       callType: 'voice'
     };

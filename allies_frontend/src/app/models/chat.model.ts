@@ -1,22 +1,11 @@
-import { User } from './user.model';
-
 export interface ChatMessage {
   id?: number;
-  maTkA: User;
-  maTkB: User;
+  maTkA: any;
+  maTkB: any;
   noiDung: string;
   thoiGian: Date;
   trangThai: string;
-  maMedia?: Media;
-}
-
-
-export interface Media {
-  id: number;
-  tenFile: string;
-  loaiFile: string;
-  duongDan: string;
-  kichThuoc: number;
+  maMedia?: any;
 }
 
 export interface ChatRoom {
@@ -25,10 +14,4 @@ export interface ChatRoom {
   participants: number[];
   lastMessage?: ChatMessage;
   unreadCount: number;
-}
-
-export interface TypingIndicator {
-  userId: number;
-  isTyping: boolean;
-  timestamp: Date;
 }

@@ -1,556 +1,477 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, Input, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChatService } from '../../services/chat.service';
 import { WebSocketService } from '../../services/websocket.service';
 import { AuthService } from '../../services/auth.service';
-import { ChatStateService } from '../../services/chat-state.service';
 import { ChatMessage, ChatRoom } from '../../models/chat.model';
-import { User } from '../../models/user.model';
-import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="chat-container">
-      <!-- Chat Header -->
-      <div class="chat-header">
-        <h3>Chat với {{ currentChatUser?.tenDn || 'Chọn người để chat' }}</h3>
-        <div class="user-info" *ngIf="currentChatUser">
-          <span class="status-indicator" [class.online]="isUserOnline"></span>
-          {{ currentChatUser.tenDn }}
-        </div>
-      </div>
-
-      <!-- Chat Messages -->
-      <div class="chat-messages" #messagesContainer>
-        <div *ngIf="messages.length === 0" class="no-messages">
-          <p>Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!</p>
-        </div>
-        
-        <div *ngFor="let message of messages" 
-             class="message" 
-             [class.sent]="message.maTkA.id === currentUser?.id"
-             [class.received]="message.maTkB.id === currentUser?.id">
-          
-          <div class="message-content">
-            <div class="message-text">{{ message.noiDung }}</div>
-            <div class="message-time">
-              {{ formatTime(message.thoiGian) }}
-              <span *ngIf="message.maTkA?.id === currentUser?.id" class="message-status">
-                {{ getStatusIcon(message.trangThai) }}
-              </span>
-            </div>
+    <div class="flex h-screen bg-gray-50">
+      <!-- Sidebar -->
+      <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <!-- Header -->
+        <div class="p-4 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-gray-800">Chats</h2>
+            <button class="btn btn-primary btn-sm">
+              <span class="material-icons">add</span>
+              New Chat
+            </button>
           </div>
         </div>
-      </div>
-
-      <!-- Typing Indicator -->
-      <div *ngIf="isTyping" class="typing-indicator">
-        <span>{{ currentChatUser?.tenDn }} đang nhập...</span>
-      </div>
-
-      <!-- Message Input -->
-      <div class="message-input" *ngIf="currentChatUser">
-        <div class="input-group">
-          <input 
-            type="text" 
-            [(ngModel)]="newMessage" 
-            (keydown.enter)="sendMessage()"
-            (keydown)="onTyping()"
-            placeholder="Nhập tin nhắn..."
-            class="message-text-input"
-            [disabled]="!isConnected">
-          <button 
-            (click)="sendMessage()" 
-            [disabled]="!newMessage.trim() || !isConnected"
-            class="send-button">
-            <i class="fas fa-paper-plane"></i>
-          </button>
+        
+        <!-- Search -->
+        <div class="p-4">
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            class="form-input"
+            [(ngModel)]="searchTerm"
+          />
+        </div>
+        
+        <!-- Chat Rooms -->
+        <div class="flex-1 overflow-y-auto">
+          @for (room of chatRooms(); track room.id) {
+            <div
+              class="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+              [class.bg-primary]="selectedRoom()?.id === room.id"
+              (click)="selectRoom(room)"
+            >
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
+                  {{ getInitials(room.name) }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate">{{ room.name }}</p>
+                  @if (room.lastMessage) {
+                    <p class="text-xs text-gray-500 truncate">{{ room.lastMessage.noiDung }}</p>
+                  }
+                </div>
+                @if (room.unreadCount > 0) {
+                  <span class="bg-primary text-white text-xs rounded-full px-2 py-1">
+                    {{ room.unreadCount }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
         </div>
       </div>
-
-      <!-- Connection Status -->
-      <div class="connection-status" [class.connected]="isConnected">
-        <span *ngIf="!isConnected">Đang kết nối...</span>
-        <span *ngIf="isConnected">Đã kết nối</span>
+      
+      <!-- Chat Area -->
+      <div class="flex-1 flex flex-col">
+        @if (selectedRoom()) {
+          <!-- Chat Header -->
+          <div class="p-4 border-b border-gray-200 bg-white">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                  {{ getInitials(selectedRoom()!.name) }}
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">{{ selectedRoom()!.name }}</h3>
+                  <p class="text-sm text-gray-500">Online</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button class="btn btn-secondary btn-sm">
+                  <span class="material-icons">videocam</span>
+                </button>
+                <button class="btn btn-secondary btn-sm">
+                  <span class="material-icons">phone</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Messages -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-4" #messagesContainer>
+            @for (message of messages(); track message.id) {
+              <div class="flex" [class.justify-end]="isCurrentUser(message)">
+                <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg"
+                     [class.bg-primary]="isCurrentUser(message)"
+                     [class.text-white]="isCurrentUser(message)"
+                     [class.bg-gray-200]="!isCurrentUser(message)"
+                     [class.text-gray-800]="!isCurrentUser(message)">
+                  <p class="text-sm">{{ message.noiDung }}</p>
+                  <p class="text-xs mt-1 opacity-70">
+                    {{ formatTime(message.thoiGian) }}
+                  </p>
+                </div>
+              </div>
+            }
+          </div>
+          
+          <!-- Message Input -->
+          <div class="p-4 border-t border-gray-200 bg-white">
+            <form (ngSubmit)="sendMessage()" class="flex space-x-2">
+              <input
+                type="text"
+                [(ngModel)]="newMessage"
+                name="message"
+                placeholder="Type a message..."
+                class="form-input flex-1"
+              />
+              <button type="submit" class="btn btn-primary">
+                <span class="material-icons">send</span>
+              </button>
+            </form>
+          </div>
+        } @else {
+          <!-- No Chat Selected -->
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-center">
+              <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span class="material-icons text-gray-400 text-2xl">chat</span>
+              </div>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
+              <p class="text-gray-500">Choose a chat to start messaging</p>
+            </div>
+          </div>
+        }
       </div>
     </div>
   `,
   styles: [`
-    .chat-container {
-      display: flex;
-      flex-direction: column;
+    .h-screen {
       height: 100vh;
-      max-width: 800px;
-      margin: 0 auto;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #fff;
     }
-
-    .chat-header {
-      background: #007bff;
-      color: white;
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    
+    .flex-1 {
+      flex: 1 1 0%;
     }
-
-    .chat-header h3 {
-      margin: 0;
-      font-size: 1.2rem;
-    }
-
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #dc3545;
-    }
-
-    .status-indicator.online {
-      background: #28a745;
-    }
-
-    .chat-messages {
-      flex: 1;
+    
+    .overflow-y-auto {
       overflow-y: auto;
-      padding: 20px;
-      background: #f8f9fa;
     }
-
-    .no-messages {
-      text-align: center;
-      color: #6c757d;
-      margin-top: 50px;
+    
+    .space-y-4 > * + * {
+      margin-top: 1rem;
     }
-
-    .message {
-      margin-bottom: 15px;
-      display: flex;
+    
+    .space-x-3 > * + * {
+      margin-left: 0.75rem;
     }
-
-    .message.sent {
+    
+    .space-x-2 > * + * {
+      margin-left: 0.5rem;
+    }
+    
+    .min-w-0 {
+      min-width: 0;
+    }
+    
+    .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .max-w-xs {
+      max-width: 20rem;
+    }
+    
+    .max-w-md {
+      max-width: 28rem;
+    }
+    
+    .justify-end {
       justify-content: flex-end;
     }
-
-    .message.received {
-      justify-content: flex-start;
-    }
-
-    .message-content {
-      max-width: 70%;
-      padding: 10px 15px;
-      border-radius: 18px;
-      position: relative;
-    }
-
-    .message.sent .message-content {
-      background: #007bff;
-      color: white;
-      border-bottom-right-radius: 5px;
-    }
-
-    .message.received .message-content {
-      background: white;
-      color: #333;
-      border: 1px solid #e9ecef;
-      border-bottom-left-radius: 5px;
-    }
-
-    .message-text {
-      word-wrap: break-word;
-      line-height: 1.4;
-    }
-
-    .message-time {
-      font-size: 0.75rem;
-      opacity: 0.7;
-      margin-top: 5px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .message.sent .message-time {
-      justify-content: flex-end;
-    }
-
-    .message-status {
-      font-size: 0.7rem;
-    }
-
-    .typing-indicator {
-      padding: 10px 20px;
-      color: #6c757d;
-      font-style: italic;
-      background: #f8f9fa;
-      border-top: 1px solid #e9ecef;
-    }
-
-    .message-input {
-      padding: 15px 20px;
-      background: white;
-      border-top: 1px solid #e9ecef;
-    }
-
-    .input-group {
-      display: flex;
-      gap: 10px;
-    }
-
-    .message-text-input {
-      flex: 1;
-      padding: 10px 15px;
-      border: 1px solid #ddd;
-      border-radius: 25px;
-      outline: none;
-      font-size: 14px;
-    }
-
-    .message-text-input:focus {
-      border-color: #007bff;
-    }
-
-    .message-text-input:disabled {
-      background: #f8f9fa;
-      cursor: not-allowed;
-    }
-
-    .send-button {
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
+    
+    .justify-center {
       justify-content: center;
-      transition: background 0.2s;
     }
-
-    .send-button:hover:not(:disabled) {
-      background: #0056b3;
+    
+    .items-center {
+      align-items: center;
     }
-
-    .send-button:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
-    }
-
-    .connection-status {
-      padding: 5px 20px;
-      font-size: 0.8rem;
+    
+    .text-center {
       text-align: center;
-      background: #dc3545;
+    }
+    
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+    
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+    
+    .mt-1 {
+      margin-top: 0.25rem;
+    }
+    
+    .w-8 {
+      width: 2rem;
+    }
+    
+    .h-8 {
+      height: 2rem;
+    }
+    
+    .w-10 {
+      width: 2.5rem;
+    }
+    
+    .h-10 {
+      height: 2.5rem;
+    }
+    
+    .w-16 {
+      width: 4rem;
+    }
+    
+    .h-16 {
+      height: 4rem;
+    }
+    
+    .text-2xl {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+    
+    .text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+    
+    .text-xl {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+    
+    .text-sm {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+    
+    .text-xs {
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+    
+    .font-semibold {
+      font-weight: 600;
+    }
+    
+    .font-medium {
+      font-weight: 500;
+    }
+    
+    .rounded-lg {
+      border-radius: 0.5rem;
+    }
+    
+    .rounded-full {
+      border-radius: 50%;
+    }
+    
+    .bg-primary {
+      background-color: var(--primary-color);
+    }
+    
+    .bg-gray-50 {
+      background-color: var(--gray-50);
+    }
+    
+    .bg-gray-200 {
+      background-color: var(--gray-200);
+    }
+    
+    .bg-white {
+      background-color: white;
+    }
+    
+    .text-white {
       color: white;
     }
-
-    .connection-status.connected {
-      background: #28a745;
+    
+    .text-gray-800 {
+      color: var(--gray-800);
     }
-
-    /* Scrollbar styling */
-    .chat-messages::-webkit-scrollbar {
-      width: 6px;
+    
+    .text-gray-900 {
+      color: var(--gray-900);
     }
-
-    .chat-messages::-webkit-scrollbar-track {
-      background: #f1f1f1;
+    
+    .text-gray-500 {
+      color: var(--gray-500);
     }
-
-    .chat-messages::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 3px;
+    
+    .text-gray-400 {
+      color: var(--gray-400);
     }
-
-    .chat-messages::-webkit-scrollbar-thumb:hover {
-      background: #a8a8a8;
+    
+    .border-r {
+      border-right-width: 1px;
     }
-
-    /* Responsive design */
-    @media (max-width: 768px) {
-      .chat-container {
-        height: 100vh;
-        border-radius: 0;
-        border: none;
-      }
-      
-      .message-content {
-        max-width: 85%;
-      }
+    
+    .border-b {
+      border-bottom-width: 1px;
+    }
+    
+    .border-t {
+      border-top-width: 1px;
+    }
+    
+    .border-gray-100 {
+      border-color: var(--gray-100);
+    }
+    
+    .border-gray-200 {
+      border-color: var(--gray-200);
+    }
+    
+    .cursor-pointer {
+      cursor: pointer;
+    }
+    
+    .hover\\:bg-gray-50:hover {
+      background-color: var(--gray-50);
     }
   `]
 })
-export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked, OnChanges {
-  @ViewChild('messagesContainer') messagesContainer!: ElementRef;
-  @Input() currentChatUser: User | null = null;
-
-  messages: ChatMessage[] = [];
-  newMessage: string = '';
-  currentUser: User | null = null;
-  isConnected: boolean = false;
-  isTyping: boolean = false;
-  typingTimeout: any;
-
-  private subscriptions: Subscription[] = [];
+export class ChatComponent implements OnInit, OnDestroy {
+  messages = signal<ChatMessage[]>([]);
+  chatRooms = signal<ChatRoom[]>([]);
+  selectedRoom = signal<ChatRoom | null>(null);
+  newMessage = '';
+  searchTerm = '';
 
   constructor(
     private chatService: ChatService,
     private webSocketService: WebSocketService,
-    private authService: AuthService,
-    private chatStateService: ChatStateService,
-    private cdr: ChangeDetectorRef
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
-    this.currentUser = this.authService.getCurrentUser();
-    
-    // Subscribe to WebSocket messages (ONLY ONCE)
-    this.subscriptions.push(
-      this.webSocketService.messages$.subscribe(message => {
-        console.log('ChatComponent received message:', message);
-        if (message) {
-          this.addMessage(message);
-        }
-      })
-    );
-
-    // Subscribe to typing indicators
-    this.subscriptions.push(
-      this.webSocketService.typing$.subscribe(typing => {
-        if (typing && typing.userId === this.currentChatUser?.id) {
-          this.isTyping = typing.isTyping;
-        }
-      })
-    );
-
-    // Subscribe to connection status changes
-    this.subscriptions.push(
-      this.webSocketService.connectionStatus$.subscribe(status => {
-        if (this.isConnected !== status) {
-          this.isConnected = status;
-          this.cdr.detectChanges();
-        }
-      })
-    );
-
-    // Get current connection status
-    this.isConnected = this.webSocketService.getConnectionStatus();
-
-    // Subscribe to user-specific messages
-    if (this.currentUser) {
-      this.webSocketService.subscribeToUserQueue(this.currentUser.tenDn);
-    }
-  }
-
-  ngAfterViewChecked(): void {
-    this.scrollToBottom();
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    console.log('ChatComponent: ngOnChanges called with:', changes);
-    if (changes['currentChatUser'] && this.currentChatUser) {
-      console.log('ChatComponent: currentChatUser changed to:', this.currentChatUser);
-      this.loadChatHistory();
-    }
+    this.webSocketService.connect();
+    this.loadChatRooms();
+    this.subscribeToMessages();
   }
 
   ngOnDestroy(): void {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
     this.webSocketService.disconnect();
   }
 
-
-  private loadChatHistory(): void {
-    if (!this.currentUser || !this.currentChatUser) return;
-
-    console.log('Loading chat history between:', this.currentUser.id, 'and', this.currentChatUser.id);
-
-    // Always load from server first to get latest messages
-    this.chatService.getConversation(this.currentUser.id, this.currentChatUser.id)
-      .subscribe({
-        next: (messages) => {
-          console.log('Loaded messages from server:', messages.length);
-          this.messages = messages || [];
-          
-          // Save to chat state service for offline access
-          this.chatStateService.saveChatHistory(this.currentChatUser!.id, this.messages);
-          
-          this.scrollToBottom();
-        },
-        error: (error) => {
-          console.error('Lỗi khi tải lịch sử chat:', error);
-          
-          // Fallback to chat state service if server fails
-          const savedMessages = this.chatStateService.getChatHistory(this.currentChatUser!.id);
-          if (savedMessages.length > 0) {
-            this.messages = savedMessages;
-            this.scrollToBottom();
-          }
+  loadChatRooms(): void {
+    // Mock data for now
+    this.chatRooms.set([
+      {
+        id: '1',
+        name: 'John Doe',
+        participants: [1, 2],
+        unreadCount: 2,
+        lastMessage: {
+          id: 1,
+          maTkA: { id: 1 },
+          maTkB: { id: 2 },
+          noiDung: 'Hey, how are you?',
+          thoiGian: new Date(),
+          trangThai: 'sent'
         }
-      });
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        participants: [1, 3],
+        unreadCount: 0,
+        lastMessage: {
+          id: 2,
+          maTkA: { id: 3 },
+          maTkB: { id: 1 },
+          noiDung: 'See you tomorrow!',
+          thoiGian: new Date(Date.now() - 3600000),
+          trangThai: 'sent'
+        }
+      }
+    ]);
+  }
+
+  subscribeToMessages(): void {
+    this.webSocketService.messages$.subscribe(message => {
+      if (message) {
+        this.messages.update(messages => [...messages, message]);
+      }
+    });
+  }
+
+  selectRoom(room: ChatRoom): void {
+    this.selectedRoom.set(room);
+    this.loadMessages(room.id);
+  }
+
+  loadMessages(roomId: string): void {
+    // Mock messages for now
+    this.messages.set([
+      {
+        id: 1,
+        maTkA: { id: 1 },
+        maTkB: { id: 2 },
+        noiDung: 'Hello! How are you doing?',
+        thoiGian: new Date(Date.now() - 3600000),
+        trangThai: 'sent'
+      },
+      {
+        id: 2,
+        maTkA: { id: 2 },
+        maTkB: { id: 1 },
+        noiDung: 'I\'m doing great! Thanks for asking.',
+        thoiGian: new Date(Date.now() - 1800000),
+        trangThai: 'sent'
+      },
+      {
+        id: 3,
+        maTkA: { id: 1 },
+        maTkB: { id: 2 },
+        noiDung: 'That\'s wonderful to hear!',
+        thoiGian: new Date(),
+        trangThai: 'sent'
+      }
+    ]);
   }
 
   sendMessage(): void {
-    if (!this.newMessage.trim() || !this.currentUser || !this.currentChatUser) return;
+    if (!this.newMessage.trim() || !this.selectedRoom()) return;
+
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) return;
 
     const message: ChatMessage = {
-      maTkA: this.currentUser,
-      maTkB: this.currentChatUser,
-      noiDung: this.newMessage.trim(),
+      maTkA: { id: currentUser.id },
+      maTkB: { id: this.selectedRoom()!.participants.find(id => id !== currentUser.id) || 0 },
+      noiDung: this.newMessage,
       thoiGian: new Date(),
-      trangThai: 'sending'
+      trangThai: 'sent'
     };
 
-    // Check and maintain WebSocket connection before sending
-    this.webSocketService.checkAndMaintainConnection();
-
-    // Send via WebSocket if connected
-    if (this.isConnected) {
-      this.webSocketService.sendMessage(message);
-      console.log('Message sent via WebSocket');
-    } else {
-      console.warn('WebSocket not connected, sending via REST API');
-      // Add message to UI immediately for sender when using REST API
-      this.addMessage(message);
-      // Fallback to REST API if WebSocket is not connected
-      this.chatService.sendMessage(message).subscribe({
-        next: (savedMessage) => {
-          console.log('Message saved via REST API:', savedMessage);
-          // Update message with server response
-          const index = this.messages.findIndex(m => m === message);
-          if (index !== -1) {
-            this.messages[index] = savedMessage;
-            // Save updated messages to chat state
-            this.chatStateService.saveChatHistory(this.currentChatUser!.id, this.messages);
-          }
-        },
-        error: (error) => {
-          console.error('Lỗi khi gửi tin nhắn:', error);
-          // Mark message as failed
-          const index = this.messages.findIndex(m => m === message);
-          if (index !== -1) {
-            this.messages[index].trangThai = 'failed';
-          }
-        }
-      });
-    }
-
+    this.webSocketService.sendMessage(message);
     this.newMessage = '';
   }
 
-  private addMessage(message: ChatMessage): void {
-    console.log('addMessage called with:', message);
-    console.log('Current chat user:', this.currentChatUser);
-    console.log('Current user:', this.currentUser);
-    
-    // Check if message is for current conversation
-    if (this.currentChatUser && 
-        ((message.maTkA?.id === this.currentUser?.id && message.maTkB?.id === this.currentChatUser.id) ||
-         (message.maTkB?.id === this.currentUser?.id && message.maTkA?.id === this.currentChatUser.id))) {
-      
-      console.log('Message is for current conversation, adding...');
-      
-      // Check if message already exists
-      const exists = this.messages.some(m => 
-        m.id === message.id || 
-        (m.noiDung === message.noiDung && new Date(m.thoiGian).getTime() === new Date(message.thoiGian).getTime())
-      );
-      
-      if (!exists) {
-        console.log('Adding new message to UI');
-        this.messages.push(message);
-        // Save to chat state service
-        this.chatStateService.addMessageToHistory(this.currentChatUser.id, message);
-        this.scrollToBottom();
-      } else {
-        console.log('Message already exists, skipping');
-      }
-    } else {
-      console.log('Message is not for current conversation, ignoring');
-    }
+  isCurrentUser(message: ChatMessage): boolean {
+    const currentUser = this.authService.getCurrentUser();
+    return currentUser ? message.maTkA.id === currentUser.id : false;
   }
 
-  onTyping(): void {
-    if (!this.currentChatUser) return;
-    
-    // Send typing indicator
-    this.webSocketService.sendTypingIndicator(this.currentChatUser.id, true);
-    
-    // Clear previous timeout
-    if (this.typingTimeout) {
-      clearTimeout(this.typingTimeout);
-    }
-    
-    // Set timeout to stop typing indicator
-    this.typingTimeout = setTimeout(() => {
-      this.webSocketService.sendTypingIndicator(this.currentChatUser!.id, false);
-    }, 1000);
-  }
-
-  private scrollToBottom(): void {
-    if (this.messagesContainer) {
-      const element = this.messagesContainer.nativeElement;
-      element.scrollTop = element.scrollHeight;
-    }
+  getInitials(name: string): string {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   }
 
   formatTime(date: Date): string {
-    const now = new Date();
-    const messageDate = new Date(date);
-    
-    if (now.toDateString() === messageDate.toDateString()) {
-      return messageDate.toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    } else {
-      return messageDate.toLocaleDateString('vi-VN', { 
-        day: '2-digit', 
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
-  }
-
-  getStatusIcon(status: string): string {
-    switch (status) {
-      case 'sent':
-        return '✓';
-      case 'delivered':
-        return '✓✓';
-      case 'read':
-        return '✓✓';
-      case 'sending':
-        return '⏳';
-      case 'failed':
-        return '❌';
-      default:
-        return '';
-    }
-  }
-
-  get isUserOnline(): boolean {
-    if (!this.currentChatUser) return false;
-    
-    // Check if user is in online users list
-    // This would need to be implemented with a proper online users service
-    // For now, we'll assume all users are online if they have a valid ID
-    return this.currentChatUser.id > 0;
+    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 }

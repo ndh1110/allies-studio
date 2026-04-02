@@ -1,468 +1,464 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ChatMainComponent } from '../chat/chat-main.component';
-import { UserSearchComponent } from '../chat/user-search.component';
-import { ChatHistoryComponent } from '../chat/chat-history.component';
-import { ChatTestComponent } from '../chat/chat-test.component';
-import { User } from '../../models/user.model';
+import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { WebSocketService } from '../../services/websocket.service';
-import { ChatStateService } from '../../services/chat-state.service';
-import { Subscription } from 'rxjs';
+import { User } from '../../models/user.model';
+import { ChatComponent } from '../chat/chat.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, ChatMainComponent, UserSearchComponent, ChatHistoryComponent, ChatTestComponent],
+  imports: [CommonModule, ChatComponent],
   template: `
-    <div class="dashboard-container">
+    <div class="min-h-screen bg-gray-50">
       <!-- Header -->
-      <div class="dashboard-header">
-        <h2>💬 Dashboard</h2>
-        <div class="header-controls">
-          <div class="user-info">
-            <span>👤 {{ currentUser?.tenDn || 'Chưa đăng nhập' }}</span>
-            <div class="connection-status" [class.connected]="isConnected">
-              {{ isConnected ? '🟢 Online' : '🔴 Offline' }}
+      <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between items-center h-16">
+            <!-- Logo -->
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <h1 class="text-2xl font-bold text-primary">Allies</h1>
+              </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="hidden md:flex space-x-8">
+              <button
+                type="button"
+                (click)="setActiveTab('add-friends')"
+                class="flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-150"
+                [class.bg-primary]="activeTab() === 'add-friends'"
+                [class.text-white]="activeTab() === 'add-friends'"
+                [class.text-gray-700]="activeTab() !== 'add-friends'"
+                [class.hover-bg-gray-100]="activeTab() !== 'add-friends'"
+              >
+                <span class="material-icons mr-2 text-lg">group_add</span>
+                Add friends
+              </button>
+
+              <button
+                (click)="setActiveTab('chat')"
+                class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                [class.bg-primary]="activeTab() === 'chat'"
+                [class.text-white]="activeTab() === 'chat'"
+                [class.text-gray-700]="activeTab() !== 'chat'"
+                [class.hover-bg-gray-100]="activeTab() !== 'chat'"
+              >
+                <span class="material-icons mr-2">chat</span>
+                Messages
+              </button>
+              <button
+                (click)="setActiveTab('calls')"
+                class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                [class.bg-primary]="activeTab() === 'calls'"
+                [class.text-white]="activeTab() === 'calls'"
+                [class.text-gray-700]="activeTab() !== 'calls'"
+                [class.hover-bg-gray-100]="activeTab() !== 'calls'"
+              >
+                <span class="material-icons mr-2">phone</span>
+                Calls
+              </button>
+              <button
+                (click)="setActiveTab('contacts')"
+                class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                [class.bg-primary]="activeTab() === 'contacts'"
+                [class.text-white]="activeTab() === 'contacts'"
+                [class.text-gray-700]="activeTab() !== 'contacts'"
+                [class.hover-bg-gray-100]="activeTab() !== 'contacts'"
+              >
+                <span class="material-icons mr-2">contacts</span>
+                Contacts
+              </button>
+            </nav>
+            
+            <!-- User Menu -->
+            <div class="flex items-center space-x-4">
+              <!-- Notifications -->
+              <button class="relative p-2 text-gray-400 hover:text-gray-500">
+                <span class="material-icons">notifications</span>
+                @if (notificationCount() > 0) {
+                  <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {{ notificationCount() }}
+                  </span>
+                }
+              </button>
+              
+              <!-- User Profile -->
+              <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                  {{ getInitials(currentUser()?.username || '') }}
+                </div>
+                <div class="hidden md:block">
+                  <p class="text-sm font-medium text-gray-900">{{ currentUser()?.username }}</p>
+                  <p class="text-xs text-gray-500">Online</p>
+                </div>
+                <button
+                  (click)="logout()"
+                  class="text-gray-400 hover:text-gray-500"
+                  title="Logout"
+                >
+                  <span class="material-icons">logout</span>
+                </button>
+              </div>
             </div>
           </div>
-          <div class="view-controls">
-            <button 
-              *ngFor="let view of views" 
-              (click)="setActiveView(view.id)"
-              [class.active]="activeView === view.id"
-              class="view-button">
-              {{ view.icon }} {{ view.name }}
-            </button>
-          </div>
         </div>
-      </div>
-
+      </header>
+      
       <!-- Main Content -->
-      <div class="dashboard-content">
-        <!-- Chat Main View -->
-        <div *ngIf="activeView === 'chat'" class="view-container">
-          <app-chat-main></app-chat-main>
-        </div>
-
-        <!-- User Search View -->
-        <div *ngIf="activeView === 'search'" class="view-container">
-          <app-user-search (userSelected)="onUserSelectedFromSearch($event)"></app-user-search>
-        </div>
-
-        <!-- Chat History View -->
-        <div *ngIf="activeView === 'history'" class="view-container">
-          <app-chat-history [currentUser]="currentUser"></app-chat-history>
-        </div>
-
-        <!-- Test View -->
-        <div *ngIf="activeView === 'test'" class="view-container">
-          <app-chat-test></app-chat-test>
-        </div>
+      <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+  @if (activeTab() === 'chat') {
+    <app-chat></app-chat>
+  } @else if (activeTab() === 'calls') {
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Call History</h2>
       </div>
-
-      <!-- Features Status -->
-      <div class="features-status">
-        <h4>📋 Trạng thái tính năng</h4>
-        <div class="feature-grid">
-          <div class="feature-item" [class.working]="isConnected">
-            <span class="feature-icon">🔌</span>
-            <span class="feature-name">WebSocket</span>
-            <span class="feature-status">{{ isConnected ? 'Hoạt động' : 'Không kết nối' }}</span>
-          </div>
-          
-          <div class="feature-item" [class.working]="true">
-            <span class="feature-icon">💾</span>
-            <span class="feature-name">Database</span>
-            <span class="feature-status">Sẵn sàng</span>
-          </div>
-          
-          <div class="feature-item" [class.working]="true">
-            <span class="feature-icon">🔍</span>
-            <span class="feature-name">Tìm kiếm</span>
-            <span class="feature-status">Hoạt động</span>
-          </div>
-          
-          <div class="feature-item" [class.working]="true">
-            <span class="feature-icon">📱</span>
-            <span class="feature-name">Responsive</span>
-            <span class="feature-status">Hoạt động</span>
-          </div>
-          
-          <div class="feature-item" [class.working]="true">
-            <span class="feature-icon">⚡</span>
-            <span class="feature-name">Real-time</span>
-            <span class="feature-status">Hoạt động</span>
-          </div>
-          
-          <div class="feature-item" [class.working]="true">
-            <span class="feature-icon">📜</span>
-            <span class="feature-name">Lịch sử</span>
-            <span class="feature-status">Hoạt động</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <h4>⚡ Thao tác nhanh</h4>
-        <div class="action-buttons">
-          <button (click)="connectWebSocket()" class="action-btn">
-            🔌 Kết nối WebSocket
-          </button>
-          <button (click)="disconnectWebSocket()" class="action-btn">
-            🔌 Ngắt kết nối
-          </button>
-          <button (click)="clearChatHistory()" class="action-btn">
-            🗑️ Xóa lịch sử
-          </button>
-          <button (click)="exportAllData()" class="action-btn">
-            📤 Xuất dữ liệu
-          </button>
-          <button (click)="testWebSocketConnection()" class="action-btn">
-            🔧 Test WebSocket
-          </button>
+      <div class="p-6">
+        <div class="text-center text-gray-500">
+          <span class="material-icons text-4xl mb-4 block">phone</span>
+          <p>No calls yet</p>
         </div>
       </div>
     </div>
+  } @else if (activeTab() === 'contacts') {
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
+      </div>
+      <div class="p-6">
+        <div class="text-center text-gray-500">
+          <span class="material-icons text-4xl mb-4 block">contacts</span>
+          <p>No contacts yet</p>
+        </div>
+      </div>
+    </div>
+  } @else if (activeTab() === 'add-friends') {
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Add Friends</h2>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="flex gap-3">
+          <input
+            type="text"
+            class="border border-gray-300 rounded-md px-4 py-2 w-full"
+            placeholder="Search username or email..."
+          />
+          <button class="px-4 py-2 rounded-md bg-primary text-white" type="button">
+            Search
+          </button>
+        </div>
+
+        <!-- danh sách kết quả mẫu -->
+        <div class="text-gray-600 italic">No results yet.</div>
+      </div>
+    </div>
+  }
+</main>
+    </div>
   `,
   styles: [`
-    .dashboard-container {
+    .min-h-screen {
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 20px;
     }
-
-    .dashboard-header {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    
+    .max-w-7xl {
+      max-width: 80rem;
+    }
+    
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+    
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    
+    .py-6 {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+    
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+    
+    .p-2 {
+      padding: 0.5rem;
+    }
+    
+    .p-6 {
+      padding: 1.5rem;
+    }
+    
+    .px-3 {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+    
+    .h-16 {
+      height: 4rem;
+    }
+    
+    .w-8 {
+      width: 2rem;
+    }
+    
+    .h-8 {
+      height: 2rem;
+    }
+    
+    .h-5 {
+      height: 1.25rem;
+    }
+    
+    .w-5 {
+      width: 1.25rem;
+    }
+    
+    .flex {
       display: flex;
-      justify-content: space-between;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    .block {
+      display: block;
+    }
+    
+    .md\\:flex {
+      display: flex;
+    }
+    
+    .md\\:block {
+      display: block;
+    }
+    
+    .items-center {
       align-items: center;
     }
-
-    .dashboard-header h2 {
-      margin: 0;
-      color: #333;
-      font-size: 2rem;
+    
+    .justify-center {
+      justify-content: center;
+    }
+    
+    .justify-between {
+      justify-content: space-between;
+    }
+    
+    .space-x-3 > * + * {
+      margin-left: 0.75rem;
+    }
+    
+    .space-x-4 > * + * {
+      margin-left: 1rem;
+    }
+    
+    .space-x-8 > * + * {
+      margin-left: 2rem;
+    }
+    
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+    
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+    
+    .-top-1 {
+      top: -0.25rem;
+    }
+    
+    .-right-1 {
+      right: -0.25rem;
+    }
+    
+    .relative {
+      position: relative;
+    }
+    
+    .absolute {
+      position: absolute;
+    }
+    
+    .text-center {
+      text-align: center;
+    }
+    
+    .text-2xl {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+    
+    .text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+    
+    .text-sm {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+    
+    .text-xs {
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+    
+    .text-4xl {
+      font-size: 2.25rem;
+      line-height: 2.5rem;
+    }
+    
+    .font-bold {
       font-weight: 700;
     }
-
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 30px;
-    }
-
-    .user-info {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 5px;
-    }
-
-    .connection-status {
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
+    
+    .font-semibold {
       font-weight: 600;
-      background: #dc3545;
-      color: white;
     }
-
-    .connection-status.connected {
-      background: #28a745;
-    }
-
-    .view-controls {
-      display: flex;
-      gap: 10px;
-    }
-
-    .view-button {
-      background: rgba(0, 123, 255, 0.1);
-      color: #007bff;
-      border: 2px solid #007bff;
-      padding: 10px 20px;
-      border-radius: 25px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s;
-    }
-
-    .view-button:hover {
-      background: #007bff;
-      color: white;
-      transform: translateY(-2px);
-    }
-
-    .view-button.active {
-      background: #007bff;
-      color: white;
-      box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
-    }
-
-    .dashboard-content {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 0;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .view-container {
-      min-height: 600px;
-    }
-
-    .features-status {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-
-    .features-status h4 {
-      margin: 0 0 15px 0;
-      color: #333;
-      font-size: 1.2rem;
-    }
-
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-    }
-
-    .feature-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 10px;
-      border-left: 4px solid #dc3545;
-      transition: all 0.3s;
-    }
-
-    .feature-item.working {
-      border-left-color: #28a745;
-      background: #d4edda;
-    }
-
-    .feature-icon {
-      font-size: 1.2rem;
-    }
-
-    .feature-name {
-      font-weight: 600;
-      color: #333;
-      flex: 1;
-    }
-
-    .feature-status {
-      font-size: 0.9rem;
-      color: #6c757d;
+    
+    .font-medium {
       font-weight: 500;
     }
-
-    .quick-actions {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    
+    .rounded-md {
+      border-radius: 0.375rem;
     }
-
-    .quick-actions h4 {
-      margin: 0 0 15px 0;
-      color: #333;
-      font-size: 1.2rem;
+    
+    .rounded-lg {
+      border-radius: 0.5rem;
     }
-
-    .action-buttons {
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
+    
+    .rounded-full {
+      border-radius: 50%;
     }
-
-    .action-btn {
-      background: linear-gradient(45deg, #007bff, #0056b3);
+    
+    .shadow {
+      box-shadow: var(--shadow-md);
+    }
+    
+    .shadow-sm {
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .bg-white {
+      background-color: white;
+    }
+    
+    .bg-primary {
+      background-color: var(--primary-color);
+    }
+    
+    .bg-red-500 {
+      background-color: #ef4444;
+    }
+    
+    .text-white {
       color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 25px;
+    }
+    
+    .text-gray-900 {
+      color: var(--gray-900);
+    }
+    
+    .text-gray-700 {
+      color: var(--gray-700);
+    }
+    
+    .text-gray-500 {
+      color: var(--gray-500);
+    }
+    
+    .text-gray-400 {
+      color: var(--gray-400);
+    }
+    
+    .text-primary {
+      color: var(--primary-color);
+    }
+    
+    .border-b {
+      border-bottom-width: 1px;
+    }
+    
+    .border-gray-200 {
+      border-color: var(--gray-200);
+    }
+    
+    .cursor-pointer {
       cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s;
-      box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
     }
-
-    .action-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+    
+    .transition-colors {
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
     }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .dashboard-header {
-        flex-direction: column;
-        gap: 20px;
-        text-align: center;
-      }
-
-      .header-controls {
-        flex-direction: column;
-        gap: 15px;
-      }
-
-      .view-controls {
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-
-      .action-buttons {
-        justify-content: center;
-      }
-
-      .feature-grid {
-        grid-template-columns: 1fr;
-      }
+    
+    .hover-text-gray-500:hover {
+      color: var(--gray-500);
+    }
+    
+    .hover-bg-gray-100:hover {
+      background-color: var(--gray-100);
+    }
+    
+    .flex-shrink-0 {
+      flex-shrink: 0;
     }
   `]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  currentUser: User | null = null;
-  isConnected: boolean = false;
-  activeView: string = 'chat';
-  
-  views = [
-    { id: 'chat', name: 'Chat', icon: '💬' },
-    { id: 'search', name: 'Tìm kiếm', icon: '🔍' },
-    { id: 'history', name: 'Lịch sử', icon: '📜' },
-    { id: 'test', name: 'Test', icon: '🧪' }
-  ];
-
-  private subscriptions: Subscription[] = [];
+  activeTab = signal<'chat' | 'calls' | 'contacts' | 'add-friends'>('chat');
+  currentUser = signal<User | null>(null);
+  notificationCount = signal(0);
 
   constructor(
     private authService: AuthService,
     private webSocketService: WebSocketService,
-    private chatStateService: ChatStateService,
-    private cdr: ChangeDetectorRef
+    private router: Router,
+    private ws: WebSocketService
   ) {}
 
   ngOnInit(): void {
-    this.currentUser = this.authService.getCurrentUser();
-    
-    // Always ensure WebSocket connection is maintained
-    this.ensureWebSocketConnection();
-    
-    this.isConnected = this.webSocketService.getConnectionStatus();
-    
-    // Subscribe to connection status changes
-    this.subscriptions.push(
-      this.webSocketService.connectionStatus$.subscribe(status => {
-        if (this.isConnected !== status) {
-          this.isConnected = status;
-          this.cdr.detectChanges();
-          
-          // If disconnected, try to reconnect (but not too aggressively)
-          if (!status && this.currentUser) {
-            console.log('WebSocket disconnected, attempting to reconnect...');
-            // Only reconnect once per disconnect to avoid loops
-            setTimeout(() => {
-              if (!this.webSocketService.getConnectionStatus()) {
-                this.ensureWebSocketConnection();
-              }
-            }, 3000); // Increased delay to 3 seconds
-          }
-        }
-      })
-    );
-
-    // Subscribe to user presence updates
-    this.subscriptions.push(
-      this.webSocketService.userPresence$.subscribe(users => {
-        console.log('User presence updated:', users);
-      })
-    );
-
-    // Subscribe to selected user changes from ChatStateService
-    this.subscriptions.push(
-      this.chatStateService.selectedUser$.subscribe(selectedUser => {
-        if (selectedUser) {
-          // Switch to chat view when a user is selected
-          this.setActiveView('chat');
-        }
-      })
-    );
-  }
-
-  private ensureWebSocketConnection(): void {
-    if (this.currentUser) {
-      if (!this.webSocketService.getConnectionStatus()) {
-        console.log('Establishing WebSocket connection...');
-        this.webSocketService.connect(this.currentUser);
-      } else {
-        console.log('WebSocket already connected');
-      }
-    }
+    try { this.ws.connect(); } catch (e) { console.warn('WS disabled:', e); }
   }
 
   ngOnDestroy(): void {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
-    // Stop WebSocket monitoring when component is destroyed
-    this.webSocketService.stopConnectionMonitoring();
+    this.ws.disconnect();
   }
 
-  setActiveView(viewId: string): void {
-    this.activeView = viewId;
-    
-    // Only ensure connection if not already connected
-    if (!this.webSocketService.getConnectionStatus() && this.currentUser) {
-      this.ensureWebSocketConnection();
-    }
+  setActiveTab(tab: 'chat' | 'calls' | 'contacts' | 'add-friends'): void {
+    this.activeTab.set(tab);
   }
 
-  connectWebSocket(): void {
-    this.webSocketService.connect(this.currentUser!);
-    this.isConnected = this.webSocketService.getConnectionStatus();
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 
-  disconnectWebSocket(): void {
-    this.webSocketService.disconnect();
-    this.isConnected = false;
-  }
-
-  clearChatHistory(): void {
-    this.chatStateService.clearMessages();
-    console.log('Đã xóa lịch sử chat');
-  }
-
-  exportAllData(): void {
-    console.log('Xuất tất cả dữ liệu chat...');
-    // Implement export functionality
-  }
-
-  onUserSelectedFromSearch(user: User): void {
-    console.log('Dashboard: User selected from search:', user);
-    // Switch to chat view when user is selected from search
-    this.setActiveView('chat');
-  }
-
-  // Method to test WebSocket connection
-  testWebSocketConnection(): void {
-    console.log('Testing WebSocket connection...');
-    this.webSocketService.checkAndMaintainConnection();
-    this.isConnected = this.webSocketService.getConnectionStatus();
-    console.log('Connection status:', this.isConnected);
+  getInitials(name: string): string {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   }
 }

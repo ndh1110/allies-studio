@@ -1,0 +1,158 @@
+<div class="page split">
+  <!-- LEFT: White, title -->
+<section class="panel panel-left">
+  <div class="left-inner">
+    <!-- TOP (nửa trên) -->
+    <div class="left-hero">
+      <img class="brand-mark" src="/pic/cloud.png" alt="Allies" />
+      <h2 class="hero-title color-brand">Welcome to Allies</h2>
+      <p class="hero-subtitle color-brand-weak">Make friend, make life!!</p>
+      <div class="hero-badges">
+        <span>Safe & Friendly</span>
+        <span>Find Allies</span>
+        <span>Join Events</span>
+      </div>
+    </div>
+
+    <!-- BOTTOM (nửa dưới) -->
+    <div class="left-illus">
+      <img class="hero-illus" src="/pic/DecorPic.png" alt="Allies illustration">
+
+    </div>
+  </div>
+</section>
+
+
+
+  <!-- RIGHT: Gradient + navbar + content -->
+<section class="panel panel-right">
+  <div class="right-inner">
+    <!-- NAVBAR (centered) -->
+    <nav class="auth-nav" [class.contact-mode]="showContact" aria-label="Auth navigation">
+      <a routerLink="/login" routerLinkActive="active" (click)="hideContact()">Sign In</a>
+      <a routerLink="/signup" routerLinkActive="active" (click)="hideContact()">Sign Up</a>
+
+      <!-- Contact Us: khi bấm -> hiện card, ẩn form -->
+      <a href="#"
+        class="contact-pill"
+        (click)="$event.preventDefault(); showContact = true"
+        [class.active]="showContact" 
+        [attr.aria-current]="showContact ? 'page' : null"
+        [attr.aria-expanded]="showContact">
+        Contact Us
+      </a>
+    </nav>
+
+    <!-- CONTACT CARD (chỉ hiện khi showContact = true) -->
+    <div class="card contact-card" *ngIf="showContact">
+      <h3 class="contact-title">Contact Us</h3>
+      <p class="contact-sub">We’d love to hear from you.</p>
+
+      <ul class="contact-list">
+        <li>
+  <strong>Email:</strong>
+  <a href="mailto:support&#64;allies.app">support&#64;allies.app</a>
+</li>
+
+        <li><strong>Phone:</strong> +84 90 000 0000</li>
+        <li><strong>Hours:</strong> Mon–Fri, 9:00–18:00 (GMT+7)</li>
+      </ul>
+
+      <div class="contact-socials">
+      <!-- Facebook -->
+      <a href="https://facebook.com" target="_blank" rel="noopener" class="icon-btn" aria-label="Facebook">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M22 12.06C22 6.49 17.52 2 12 2S2 6.49 2 12.06c0 4.99 3.65 9.14 8.42 9.93v-7.02H7.9v-2.91h2.52V9.4c0-2.49 1.48-3.87 3.75-3.87 1.09 0 2.23.19 2.23.19v2.45h-1.25c-1.24 0-1.62.77-1.62 1.56v1.86h2.76l-.44 2.91h-2.32v7.02C18.35 21.2 22 17.05 22 12.06z"/>
+        </svg>
+      </a>
+
+      <!-- Instagram -->
+      <a href="https://instagram.com" target="_blank" rel="noopener" class="icon-btn" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7zm5 2.5A5.5 5.5 0 1 1 6.5 12 5.5 5.5 0 0 1 12 6.5zm0 2A3.5 3.5 0 1 0 15.5 12 3.5 3.5 0 0 0 12 8.5zm5-2.25a1.25 1.25 0 1 1-1.25 1.25A1.25 1.25 0 0 1 17 6.25z"/>
+        </svg>
+      </a>
+
+      <!-- Email -->
+      <a [attr.href]="'mailto:support@allies.app'" class="icon-btn" aria-label="Email">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5z"/>
+        </svg>
+      </a>
+    </div>
+
+      <button type="button" class="btn btn-secondary contact-close" (click)="hideContact()">Back</button>
+    </div>
+
+    <!-- SIGNUP FORM CARD (ẩn khi showContact = true) -->
+    <div class="card" *ngIf="!showContact">
+      <form (ngSubmit)="onSubmit()" class="form" novalidate>
+        <!-- Username -->
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input id="username" name="username" type="text"
+                 [(ngModel)]="form.username" required
+                 class="form-input" placeholder="Enter your username"
+                 autocomplete="username" />
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="email" class="form-label">Email</label>
+          <input id="email" name="email" type="email"
+                 [(ngModel)]="form.email" required
+                 class="form-input" placeholder="Enter your email"
+                 autocomplete="email" (input)="touch.email = true" />
+          <div *ngIf="touch.email && !emailValid" class="hint-bad">Invalid email format.</div>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input id="password" name="password" type="password"
+                 [(ngModel)]="form.password" required
+                 class="form-input" placeholder="Enter your password"
+                 autocomplete="new-password" (input)="touch.password = true" />
+          <ul class="pw-hints">
+            <li [class.hint-ok]="hasMinLength" [class.hint-bad]="!hasMinLength">At least 8 characters</li>
+            <li [class.hint-ok]="hasUpper"     [class.hint-bad]="!hasUpper">At least one uppercase letter</li>
+            <li [class.hint-ok]="hasLower"     [class.hint-bad]="!hasLower">At least one lowercase letter</li>
+            <li [class.hint-ok]="hasDigit"     [class.hint-bad]="!hasDigit">At least one number</li>
+          </ul>
+        </div>
+
+        <!-- Confirm password -->
+        <div class="form-group">
+          <label for="confirmPassword" class="form-label">Confirm password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password"
+                 [(ngModel)]="form.confirmPassword" required
+                 class="form-input" placeholder="Re-enter your password"
+                 autocomplete="new-password" (input)="touch.confirm = true" />
+          <div *ngIf="touch.confirm && !passwordsMatch" class="hint-bad">Passwords do not match.</div>
+        </div>
+
+        <!-- Error -->
+        <div *ngIf="errorMessage()" class="error-msg">{{ errorMessage() }}</div>
+
+        <button type="submit"
+                [disabled]="isLoading() || !formValid"
+                [attr.aria-disabled]="(isLoading() || !formValid) ? true : null"
+                class="btn btn-primary">
+          <span *ngIf="!isLoading()">Sign up</span>
+          <span *ngIf="isLoading()">Creating...</span>
+        </button>
+
+        <div class="footer">
+          <p class="footer-text">
+            Already have an account?
+            <a routerLink="/login" class="footer-link">Sign in</a>
+          </p>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+</div>

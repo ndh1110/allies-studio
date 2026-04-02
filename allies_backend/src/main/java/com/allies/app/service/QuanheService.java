@@ -34,15 +34,6 @@ public class QuanheService {
     public List<Quanhe> getFriends(Integer userId) {
         Taikhoan user = taikhoanRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
-        List<Quanhe> friendships = quanheRepository.findByMaTkAOrMaTkB(user, user);
-        
-        // Force loading of related entities to avoid LazyInitializationException
-        for (Quanhe friendship : friendships) {
-            // Access the related entities to trigger loading
-            friendship.getMaTkA().getTenDn();
-            friendship.getMaTkB().getTenDn();
-        }
-        
-        return friendships;
+        return quanheRepository.findByMaTkAOrMaTkB(user, user);
     }
 }

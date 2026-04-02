@@ -1,11 +1,7 @@
 export interface User {
   id: number;
-  tenDn: string;
-  email: string;
+  username: string;
   avatar?: string;
-  avarta?: string; // Backend uses 'avarta'
-  online?: boolean;
-  lastSeen?: Date;
 }
 
 export interface LoginRequest {
@@ -20,7 +16,7 @@ export interface SignupRequest {
 
 export interface AuthResponse {
   token: string;
-  type?: string;
+  type: string;
   id: number;
   username: string;
 }

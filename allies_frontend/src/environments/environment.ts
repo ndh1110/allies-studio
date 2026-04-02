@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://omnivorously-oxycephalic-christiana.ngrok-free.dev/api',
-  //https://omnivorously-oxycephalic-christiana.ngrok-free.dev/
-  wsUrl: 'https://omnivorously-oxycephalic-christiana.ngrok-free.dev/ws'
+  apiUrl: 'http://localhost:8080/api',
+  //hoặc http://localhost:8080/api và https://retta-nonentomologic-extraterritorially.ngrok-free.dev/api
+  wsUrl: 'http://localhost:8080/ws'
 };

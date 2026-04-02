@@ -15,8 +15,8 @@
     "target": "ES2022",
     "module": "preserve",
     "moduleResolution": "node",
-    "lib": ["es2022", "dom"],
-    "types": ["sockjs-client", "stompjs"]
+    "lib": ["es2022", "dom"], // Thêm lib để hỗ trợ ES2022 và DOM
+    "types": []
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

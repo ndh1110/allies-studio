@@ -52,4 +52,17 @@ public class LoimoiketbanService {
                 .orElseThrow(() -> new IllegalArgumentException("Người nhận không tồn tại"));
         return loimoiketbanRepository.findByMaTkNhanAndTrangThai(receiver, "PENDING");
     }
+    // 1) Lấy danh sách đã gửi
+    public List<Loimoiketban> getSentRequests(Taikhoan sender) {
+    return loimoiketbanRepository.findByMaTkGui(sender); // :contentReference[oaicite:11]{index=11}
+    }
+
+    // 2) Hủy lời mời (xóa hoặc set trạng thái CANCELED)
+    public void cancelFriendRequest(Integer requestId) {
+    loimoiketbanRepository.deleteById(requestId);
+    // hoặc:
+    // Loimoiketban req = loimoiketbanRepository.findById(requestId).orElseThrow(...);
+    // req.setTrangThai("CANCELED"); loimoiketbanRepository.save(req);
+    }
+
 }

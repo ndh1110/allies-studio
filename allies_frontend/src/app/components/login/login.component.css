@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+/* ====== LAYOUT ====== */
+.page.split{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:1fr 1fr; /* Trắng | Tím */
+}
+
+/* PANEL TRẮNG */
+.panel-left{
+  background:#fff;
+  display:flex;
+  align-items:stretch;          /* full height */
+  justify-content:center;       /* .left-inner ở giữa cột trái */
+}
+
+.left-inner{
+  width:100%;
+  max-width:none;               /* KHÔNG bó hẹp 680px nữa */
+  padding:32px 48px;
+  box-sizing:border-box;
+
+  /* CHIA ĐÔI THEO CHIỀU DỌC */
+  display:grid;
+  grid-template-rows:1fr 1fr;   /* nửa trên: chữ | nửa dưới: ảnh */
+  height:100vh;                 /* bám viewport để đúng 1/2 + 1/2 */
+  position:relative;            /* để ::before */
+}
+
+.left-inner::before{
+  content:"";
+  position:absolute; 
+  inset:0 auto auto 0; 
+  height:50%; 
+  width:100%;
+  pointer-events:none;
+  background: radial-gradient(#eceff1 1.2px, transparent 1.2px) 0 0/18px 18px;
+  opacity:.5;
+  mask: linear-gradient(to bottom, rgba(0,0,0,.6), rgba(0,0,0,0));
+}
+
+/* Nửa trên (chữ) */
+.left-hero{
+  display:flex; 
+  flex-direction:column; 
+  justify-content:center; 
+  align-items:center;
+  text-align:center; 
+  padding-top: 8px;
+  position: relative; 
+  overflow: hidden;
+}
+.left-hero h2, 
+.left-hero p, 
+.left-hero .hero-badges {
+  position: relative;
+  z-index: 1; /* Đẩy chữ nổi lên lớp trên cùng */
+}
+.title{
+  font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 800;
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 8px 0 6px;
+  color:#111827; /* slate-900 */
+}
+
+.subtitle{
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: clamp(15px, 1.8vw, 20px);
+  color:#4b5563; /* slate-600 */
+}
+
+/* Nửa dưới (ảnh) */
+.left-illus{
+  align-self:stretch;           /* chiếm trọn nửa dưới */
+  min-height:0;                 /* cho phép co trong grid */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;              /* nếu ảnh lớn hơn khung, cắt mép gọn */
+  padding:0;
+}
+.hero-illus{
+  width:100%;
+  height:100%;
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;           /* phóng to tối đa, KHÔNG méo/cắt */
+  display:block;
+}
+
+/* PANEL TÍM (giữ nguyên) */
+.panel-right{
+  position: relative;
+  background: linear-gradient(135deg,#5f7cf3 0%,#7a58f2 100%);
+  display: grid;
+  place-items: center;
+  padding: 24px 24px 24px; /* padding ngang/bottom giữ nguyên */
+  padding-top: 96px;       /* chừa không gian cố định cho navbar */
+}
+.card{
+  width:100%;
+  max-width:720px;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.15);
+  padding:28px;
+}
+
+.form-group{margin-bottom:16px;}
+.form-label{display:block;font-weight:600;color:#0f172a;margin-bottom:6px;}
+.input{
+  width:100%;padding:10px 12px;border-radius:8px;
+  border:1px solid #e2e8f0;background:#f8fafc;outline:none;
+}
+.input:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.15);}
+.btn.primary{
+  width:100%;padding:12px 14px;border:0;border-radius:10px;
+  background:#3b33c4;color:#fff;font-weight:700;cursor:pointer;
+}
+.btn.primary:disabled{opacity:.6;cursor:not-allowed;}
+.link-line{margin-top:14px;color:#475569;}
+.link-line a{color:#3b33c4;text-decoration:underline;}
+.error{color:#b91c1c;margin-top:10px;}
+
+/* ====== RESPONSIVE ====== */
+@media (max-width:960px){
+  .page.split{grid-template-columns:1fr;}
+  .panel-right,.panel-left{padding:20px;}
+  .left-inner{
+    grid-template-rows:auto auto; /* mobile để tự nhiên */
+    height:auto;
+    padding:24px 20px;
+  }
+  .left-hero{text-align:center;}
+  .hero-illus{ object-fit: cover; }
+}
+/* ===== Navbar on purple panel (CENTERED, CLEAN) ===== */
+.right-inner{
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+
+/* navbar giữa */
+.auth-nav{
+  position: absolute;
+  top: 24px;                /* cùng cao với tiêu đề panel trắng (~32px) */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 920px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+/* nav pills */
+.auth-nav a{
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08) inset;
+}
+.auth-nav a:hover{ transform: translateY(-1px); background: rgba(255,255,255,.26); }
+.auth-nav a.active{ background: #fff; color: #3b33c4; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+
+/* icons cạnh Contact Us */
+.auth-nav .socials{
+  display: inline-flex;
+  gap: 8px;
+  margin-left: 6px;
+}
+.icon-btn{
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08) inset;
+  transition: transform .12s ease, background .12s ease;
+}
+.icon-btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.26); }
+
+/* card cũng ở giữa dưới navbar */
+.card{ margin: 0 auto; }
+
+@media (max-width:960px){
+  .panel-right{ padding-top: 80px; }
+  .right-inner{ max-width: 720px; }
+}
+
+/* Contact card tweaks */
+.contact-card { text-align: center; }
+.contact-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color:#0f172a; }
+.contact-sub { margin: 0 0 14px; color:#475569; }
+.contact-list { list-style: none; padding:0; margin: 0 0 12px; }
+.contact-list li { margin: 4px 0; }
+.contact-socials { display: flex; justify-content: center; gap: 10px; margin-top: 6px; }
+.icon-btn { width: 36px; height: 36px; }        /* to hơn một chút trong card */
+.contact-close { margin-top: 14px; }
+.btn.btn-secondary { background: #ffffff; color:#3b33c4; border:1px solid rgba(59,51,196,.35); }
+.btn.btn-secondary:hover{ background:#f3f4f6; }
+
+.hero-badges{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
+.hero-badges span{
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background:#f3f4f6; color:#475569; border:1px solid #e5e7eb;
+}
+.brand-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Phóng to tràn viền mà không méo ảnh */
+  z-index: 0;        /* Nằm chìm dưới chữ */
+  opacity: 0.3;      /* Giảm độ mờ xuống 30% để chữ Welcome dễ đọc hơn */
+}
+.icon-btn svg{
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.auth-nav.contact-mode a.active:not(.contact-pill){
+  background: rgba(255,255,255,.18) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08) inset !important;
+}
+
+/* Contact Us vẫn là pill active sáng */
+.auth-nav.contact-mode .contact-pill.active{
+  background: #fff !important;
+  color: #3b33c4 !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12) !important;
+}

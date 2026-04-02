@@ -15,6 +15,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.lang.NonNull;
 
 public class JwtAuthTokenFilter extends OncePerRequestFilter {
 
@@ -27,17 +28,9 @@ public class JwtAuthTokenFilter extends OncePerRequestFilter {
     }
     
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         try {
-            // Skip JWT filter for /api/users/** endpoints
-            String requestPath = request.getRequestURI();
-            if (requestPath.startsWith("/api/users/")) {
-                System.out.println("Skipping JWT filter for: " + requestPath);
-                filterChain.doFilter(request, response);
-                return;
-            }
-
             // 1. Lấy JWT từ Header Authorization (Ví dụ: Bearer <token>)
             String jwt = parseJwt(request);
 

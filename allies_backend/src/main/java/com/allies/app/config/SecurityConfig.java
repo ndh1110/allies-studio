@@ -1,112 +1,124 @@
 package com.allies.app.config;
 
-import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import com.allies.app.service.TaikhoanService;
+
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
-import com.allies.app.repository.TaikhoanRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import com.allies.app.security.JwtAuthTokenFilter;
 import com.allies.app.security.JwtUtils;
-import com.allies.app.service.TaikhoanService;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // ====== 1. Password encoder ======
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+  // ===== Core beans =====
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
-    // ====== 2. Service cho user details ======
-    @Bean
-    public TaikhoanService taikhoanService(TaikhoanRepository taikhoanRepository, PasswordEncoder passwordEncoder) {
-        return new TaikhoanService(taikhoanRepository, passwordEncoder);
-    }
+  /** Cho AuthController dùng khi login */
+  @Bean
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration conf) throws Exception {
+    return conf.getAuthenticationManager();
+  }
 
-    // ====== 3. Cấu hình AuthenticationProvider ======
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider(TaikhoanService taikhoanService, PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(taikhoanService);
-        provider.setPasswordEncoder(passwordEncoder);
-        return provider;
-    }
+  /**
+   * Dùng UserDetailsService từ TaikhoanService (@Service implements UserDetailsService).
+   * Ở version Spring Security của bạn, DaoAuthenticationProvider CHƯA có ctor (uds, encoder),
+   * vì vậy dùng setter (deprecated ở bản mới) và tắt warning.
+   */
+  @Bean
+  @SuppressWarnings("deprecation")
+  public AuthenticationProvider daoAuthenticationProvider(
+      UserDetailsService uds, PasswordEncoder encoder) {
+    DaoAuthenticationProvider p = new DaoAuthenticationProvider();
+    p.setUserDetailsService(uds);
+    p.setPasswordEncoder(encoder);
+    return p;
+  }
 
-    // ====== 4. AuthenticationManager ======
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
+  // ===== JWT utils & filter =====
+  @Bean
+  public JwtUtils jwtUtils() {
+    return new JwtUtils();
+  }
 
-    // ====== 5. JWT filter ======
-    @Bean
-    public JwtAuthTokenFilter jwtAuthTokenFilter(JwtUtils jwtUtils, TaikhoanService taikhoanService) {
-        return new JwtAuthTokenFilter(jwtUtils, taikhoanService);
-    }
+  /**
+   * Tùy chữ ký constructor của JwtAuthTokenFilter:
+   *  - Nếu filter của bạn là (JwtUtils, TaikhoanService) => dùng UserDetailsService uds như dưới vẫn OK
+   *    miễn TaikhoanService implements UserDetailsService.
+   *  - Nếu nó nhận đúng (JwtUtils, UserDetailsService) thì càng khớp.
+   */
+  @Bean
+public JwtAuthTokenFilter jwtAuthTokenFilter(JwtUtils jwtUtils, TaikhoanService taikhoanService) {
+    return new JwtAuthTokenFilter(jwtUtils, taikhoanService);
+}
 
-    // ====== 6. JWT utils ======
-    // JwtUtils is now a @Component, so we don't need to create a bean
+  // ===== Security chain =====
+  @Bean
+  public SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      AuthenticationProvider daoProvider,
+      JwtAuthTokenFilter jwtAuthTokenFilter) throws Exception {
 
-    // ====== 7. CORS configuration ======
-    @Bean
-    public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:*",
-                "http://localhost:4200",
-                "http://127.0.0.1:*",
-                "http://192.168.*.*",
-                "http://10.*.*.*",
-                "https://*.ngrok-free.dev",
-                "https://*.ngrok.io"
-        ));
-        config.setAllowedHeaders(Arrays.asList("*"));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        config.setMaxAge(3600L);
+    http
+      .csrf(csrf -> csrf.disable())
+      .cors(Customizer.withDefaults())
+      .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+      .authorizeHttpRequests(auth -> auth
+        // public endpoints
+        .requestMatchers("/api/auth/**", "/api/test/**", "/ws/**").permitAll()
+        // protected endpoints
+        .requestMatchers("/api/users/search").authenticated()
+        .requestMatchers("/api/loimoiketban/**").authenticated()
+        // những API còn lại yêu cầu login
+        .anyRequest().authenticated()
+      )
+      .authenticationProvider(daoProvider)
+      .addFilterBefore(jwtAuthTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
-    }
+    return http.build();
+  }
 
-    // ====== 8. Security filter chain ======
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthTokenFilter jwtAuthTokenFilter,
-                                                   DaoAuthenticationProvider authProvider) throws Exception {
+  // ===== CORS (localhost + ngrok) =====
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration cfg = new CorsConfiguration();
+    cfg.setAllowCredentials(true);
+    cfg.setAllowedOriginPatterns(List.of(
+      "http://localhost:4200",
+      "https://*.ngrok-free.dev",
+      "https://*.ngrok.io"
+    ));
+    cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+    cfg.setAllowedHeaders(List.of("*"));
+    cfg.setExposedHeaders(List.of("Authorization"));
 
-        http
-            .cors(cors -> {})
-            .csrf(csrf -> csrf.disable())
-            .authenticationProvider(authProvider)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/test/**", "/ws/**", "/api/chat/**", "/api/users/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/**").permitAll()
-                .anyRequest().permitAll()
-            )
-            .addFilterBefore(jwtAuthTokenFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", cfg);
+    return source;
+  }
 }
