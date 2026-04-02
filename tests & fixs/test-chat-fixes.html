@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chat Fixes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Test Chat Fixes</h2>
+        <p>Test các sửa đổi cho Test Chat và chức năng tìm kiếm</p>
+        
+        <div class="instructions">
+            <h4>📋 Hướng dẫn test:</h4>
+            <ol>
+                <li><strong>Khởi động backend:</strong> <code>cd allies_backend && mvn spring-boot:run</code></li>
+                <li><strong>Khởi động frontend:</strong> <code>cd allies_frontend && ng serve</code></li>
+                <li><strong>Truy cập:</strong> <code>http://localhost:4200/dashboard</code></li>
+                <li><strong>Test WebSocket:</strong> Click "🔌 Kết nối WebSocket" trong dashboard</li>
+                <li><strong>Test Chat:</strong> Chuyển sang tab "Test" và click "🔌 Kết nối lại"</li>
+                <li><strong>Test tìm kiếm:</strong> Chuyển sang tab "Tìm kiếm" và tìm user</li>
+            </ol>
+        </div>
+
+        <!-- Test 1: Backend Status -->
+        <div class="test-section">
+            <h3>1. Kiểm tra Backend Status</h3>
+            <button onclick="testBackendStatus()">Kiểm tra Backend</button>
+            <button onclick="testWebSocketEndpoint()">Test WebSocket Endpoint</button>
+            <div id="backend-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Test 2: User Search -->
+        <div class="test-section">
+            <h3>2. Test Tìm kiếm User</h3>
+            <button onclick="testUserSearch()">Test tìm kiếm user</button>
+            <div id="search-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Test 3: Chat Functionality -->
+        <div class="test-section">
+            <h3>3. Test Chat Functionality</h3>
+            <button onclick="testChatFunctionality()">Test gửi tin nhắn</button>
+            <div id="chat-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Test 4: Friendship Check -->
+        <div class="test-section">
+            <h3>4. Kiểm tra Quan hệ Bạn bè</h3>
+            <button onclick="checkFriendships()">Kiểm tra bạn bè</button>
+            <div id="friendship-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Test 1: Backend Status
+        async function testBackendStatus() {
+            try {
+                showResult('backend-result', 'Đang kiểm tra backend...', 'info');
+                
+                const response = await fetch('http://localhost:8080/api/test/users');
+                const users = await response.json();
+                
+                if (response.ok) {
+                    showResult('backend-result', `✅ Backend hoạt động tốt!\n\nTìm thấy ${users.length} users:\n${users.map(u => `- ${u.tenDn} (ID: ${u.maTk})`).join('\n')}`, 'success');
+                } else {
+                    showResult('backend-result', `❌ Backend lỗi: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('backend-result', `❌ Không thể kết nối backend: ${error.message}\n\nHãy đảm bảo backend đang chạy:\ncd allies_backend && mvn spring-boot:run`, 'error');
+            }
+        }
+
+        async function testWebSocketEndpoint() {
+            try {
+                showResult('backend-result', 'Đang test WebSocket endpoint...', 'info');
+                
+                const response = await fetch('http://localhost:8080/api/test/websocket-test');
+                const text = await response.text();
+                
+                if (response.ok) {
+                    showResult('backend-result', `✅ WebSocket endpoint hoạt động!\n\n${text}\n\nBây giờ có thể test WebSocket trong dashboard.`, 'success');
+                } else {
+                    showResult('backend-result', `❌ WebSocket endpoint lỗi: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('backend-result', `❌ WebSocket endpoint không hoạt động: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 2: User Search
+        async function testUserSearch() {
+            try {
+                showResult('search-result', 'Đang test tìm kiếm user...', 'info');
+                
+                const response = await fetch('http://localhost:8080/api/test/search-users?q=user');
+                const users = await response.json();
+                
+                if (response.ok) {
+                    showResult('search-result', `✅ Tìm kiếm hoạt động!\n\nTìm thấy ${users.length} user(s) với từ khóa "user":\n${users.map(u => `- ${u.tenDn} (ID: ${u.maTk})`).join('\n')}\n\nBây giờ có thể tìm kiếm trong dashboard và click nút "Chat" để chọn user.`, 'success');
+                } else {
+                    showResult('search-result', `❌ Lỗi tìm kiếm: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('search-result', `❌ Lỗi tìm kiếm: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 3: Chat Functionality
+        async function testChatFunctionality() {
+            try {
+                showResult('chat-result', 'Đang test chức năng chat...', 'info');
+                
+                const body = {
+                    username1: 'user5',
+                    username2: 'admin123',
+                    message: 'Test message from chat fixes!'
+                };
+
+                const response = await fetch('http://localhost:8080/api/test/test-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body)
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    showResult('chat-result', `✅ Chat hoạt động tốt!\n\n${responseText}\n\nBây giờ có thể test chat trong dashboard:\n1. Chuyển sang tab "Test"\n2. Click "🔌 Kết nối lại"\n3. Gửi tin nhắn`, 'success');
+                } else {
+                    showResult('chat-result', `❌ Lỗi chat: ${response.status}\n${responseText}`, 'error');
+                }
+            } catch (error) {
+                showResult('chat-result', `❌ Lỗi test chat: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 4: Friendship Check
+        async function checkFriendships() {
+            try {
+                showResult('friendship-result', 'Đang kiểm tra quan hệ bạn bè...', 'info');
+                
+                let result = '';
+                
+                // Check friends of user5
+                try {
+                    const response1 = await fetch('http://localhost:8080/api/test/friends/user5');
+                    const friends1 = await response1.text();
+                    result += `=== BẠN BÈ CỦA USER5 ===\n${friends1}\n\n`;
+                } catch (e) {
+                    result += `Lỗi khi lấy bạn bè của user5: ${e.message}\n\n`;
+                }
+                
+                // Check friends of admin123
+                try {
+                    const response2 = await fetch('http://localhost:8080/api/test/friends/admin123');
+                    const friends2 = await response2.text();
+                    result += `=== BẠN BÈ CỦA ADMIN123 ===\n${friends2}\n`;
+                } catch (e) {
+                    result += `Lỗi khi lấy bạn bè của admin123: ${e.message}\n`;
+                }
+                
+                showResult('friendship-result', result, 'info');
+                
+            } catch (error) {
+                showResult('friendship-result', `❌ Lỗi kiểm tra bạn bè: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        // Auto-test on load
+        window.onload = function() {
+            testBackendStatus();
+        };
+    </script>
+</body>
+</html>
+
+

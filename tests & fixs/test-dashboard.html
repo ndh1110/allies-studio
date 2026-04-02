@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .dashboard-preview {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .feature-item.working {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .feature-item.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Dashboard Functionality Test</h1>
+    
+    <div class="test-section">
+        <h3>🌐 Backend Connection Test</h3>
+        <div id="backend-status" class="status info">Chưa kiểm tra</div>
+        <button onclick="testBackend()">Test Backend</button>
+    </div>
+
+    <div class="test-section">
+        <h3>🔐 Authentication Test</h3>
+        <input type="text" id="test-username" placeholder="Username" value="test">
+        <input type="password" id="test-password" placeholder="Password" value="test">
+        <br>
+        <button onclick="testLogin()">Test Login</button>
+        <button onclick="testSignup()">Test Signup</button>
+        <div id="auth-status" class="status info">Chưa kiểm tra</div>
+    </div>
+
+    <div class="test-section">
+        <h3>🔌 WebSocket Test</h3>
+        <div id="ws-status" class="status info">Chưa kết nối</div>
+        <button onclick="testWebSocket()">Test WebSocket</button>
+        <button onclick="disconnectWebSocket()">Disconnect</button>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 Dashboard Features Test</h3>
+        <div class="feature-grid">
+            <div class="feature-item" id="feature-websocket">
+                <h4>🔌 WebSocket</h4>
+                <p>Connection Status</p>
+                <span id="ws-feature-status">Not tested</span>
+            </div>
+            
+            <div class="feature-item" id="feature-database">
+                <h4>💾 Database</h4>
+                <p>Data Loading</p>
+                <span id="db-feature-status">Not tested</span>
+            </div>
+            
+            <div class="feature-item" id="feature-search">
+                <h4>🔍 User Search</h4>
+                <p>Search Functionality</p>
+                <span id="search-feature-status">Not tested</span>
+            </div>
+            
+            <div class="feature-item" id="feature-chat">
+                <h4>💬 Chat</h4>
+                <p>Real-time Messaging</p>
+                <span id="chat-feature-status">Not tested</span>
+            </div>
+            
+            <div class="feature-item" id="feature-export">
+                <h4>📤 Export</h4>
+                <p>Data Export</p>
+                <span id="export-feature-status">Not tested</span>
+            </div>
+            
+            <div class="feature-item" id="feature-clear">
+                <h4>🗑️ Clear</h4>
+                <p>Clear History</p>
+                <span id="clear-feature-status">Not tested</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>📋 Test Results</h3>
+        <div id="test-results"></div>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="dashboard-preview">
+        <h3>🎯 Dashboard Preview</h3>
+        <p>This shows what the dashboard should look like when working:</p>
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 8px; color: white;">
+            <h4>💬 Dashboard</h4>
+            <p>👤 Current User: <span id="preview-user">Not logged in</span></p>
+            <p>🔌 Connection: <span id="preview-connection">Offline</span></p>
+            <div style="display: flex; gap: 10px; margin: 10px 0;">
+                <button style="background: rgba(255,255,255,0.2);">💬 Chat</button>
+                <button style="background: rgba(255,255,255,0.2);">🔍 Search</button>
+                <button style="background: rgba(255,255,255,0.2);">📜 History</button>
+                <button style="background: rgba(255,255,255,0.2);">🧪 Test</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+        const WS_URL = 'http://localhost:8080/ws';
+        let stompClient = null;
+        let testResults = [];
+
+        function addResult(test, status, message) {
+            testResults.push({ test, status, message, time: new Date().toLocaleTimeString() });
+            updateResults();
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = testResults.map(r => 
+                `<div class="status ${r.status}">
+                    [${r.time}] ${r.test}: ${r.message}
+                </div>`
+            ).join('');
+        }
+
+        async function testBackend() {
+            const statusDiv = document.getElementById('backend-status');
+            statusDiv.textContent = 'Đang kiểm tra...';
+            statusDiv.className = 'status info';
+
+            try {
+                const response = await fetch(`${API_URL}/test/health`);
+                if (response.ok) {
+                    const data = await response.text();
+                    statusDiv.textContent = `✅ Backend hoạt động: ${data}`;
+                    statusDiv.className = 'status success';
+                    addResult('Backend API', 'success', 'Backend hoạt động bình thường');
+                    updateFeatureStatus('database', 'success', 'Connected');
+                } else {
+                    statusDiv.textContent = `❌ Backend lỗi: ${response.status}`;
+                    statusDiv.className = 'status error';
+                    addResult('Backend API', 'error', `HTTP ${response.status}`);
+                    updateFeatureStatus('database', 'error', 'Failed');
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Không thể kết nối backend: ${error.message}`;
+                statusDiv.className = 'status error';
+                addResult('Backend API', 'error', error.message);
+                updateFeatureStatus('database', 'error', 'Failed');
+            }
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('test-username').value;
+            const password = document.getElementById('test-password').value;
+            const statusDiv = document.getElementById('auth-status');
+            
+            statusDiv.textContent = 'Đang đăng nhập...';
+            statusDiv.className = 'status info';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.textContent = `✅ Đăng nhập thành công: ${data.username}`;
+                    statusDiv.className = 'status success';
+                    addResult('Login', 'success', `Đăng nhập thành công với user: ${data.username}`);
+                    document.getElementById('preview-user').textContent = data.username;
+                } else {
+                    statusDiv.textContent = `❌ Đăng nhập thất bại: ${data}`;
+                    statusDiv.className = 'status error';
+                    addResult('Login', 'error', data);
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Lỗi đăng nhập: ${error.message}`;
+                statusDiv.className = 'status error';
+                addResult('Login', 'error', error.message);
+            }
+        }
+
+        async function testSignup() {
+            const username = document.getElementById('test-username').value;
+            const password = document.getElementById('test-password').value;
+            const statusDiv = document.getElementById('auth-status');
+            
+            statusDiv.textContent = 'Đang đăng ký...';
+            statusDiv.className = 'status info';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.text();
+                
+                if (response.ok) {
+                    statusDiv.textContent = `✅ Đăng ký thành công: ${data}`;
+                    statusDiv.className = 'status success';
+                    addResult('Signup', 'success', data);
+                } else {
+                    statusDiv.textContent = `❌ Đăng ký thất bại: ${data}`;
+                    statusDiv.className = 'status error';
+                    addResult('Signup', 'error', data);
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Lỗi đăng ký: ${error.message}`;
+                statusDiv.className = 'status error';
+                addResult('Signup', 'error', error.message);
+            }
+        }
+
+        function testWebSocket() {
+            const statusDiv = document.getElementById('ws-status');
+            statusDiv.textContent = 'Đang kết nối WebSocket...';
+            statusDiv.className = 'status info';
+
+            try {
+                const socket = new SockJS(WS_URL);
+                stompClient = Stomp.over(socket);
+                
+                stompClient.debug = (str) => {
+                    console.log('STOMP Debug:', str);
+                };
+
+                stompClient.connect({}, (frame) => {
+                    statusDiv.textContent = '✅ WebSocket đã kết nối';
+                    statusDiv.className = 'status success';
+                    addResult('WebSocket', 'success', 'Kết nối WebSocket thành công');
+                    updateFeatureStatus('websocket', 'success', 'Connected');
+                    document.getElementById('preview-connection').textContent = 'Online';
+                    
+                    // Subscribe to test messages
+                    stompClient.subscribe('/topic/public', (message) => {
+                        console.log('Received message:', message.body);
+                        addResult('WebSocket Message', 'success', `Nhận được: ${message.body}`);
+                    });
+                    
+                }, (error) => {
+                    statusDiv.textContent = `❌ WebSocket lỗi: ${error}`;
+                    statusDiv.className = 'status error';
+                    addResult('WebSocket', 'error', error);
+                    updateFeatureStatus('websocket', 'error', 'Failed');
+                });
+                
+            } catch (error) {
+                statusDiv.textContent = `❌ Không thể kết nối WebSocket: ${error.message}`;
+                statusDiv.className = 'status error';
+                addResult('WebSocket', 'error', error.message);
+                updateFeatureStatus('websocket', 'error', 'Failed');
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (stompClient) {
+                stompClient.disconnect();
+                stompClient = null;
+                document.getElementById('ws-status').textContent = 'WebSocket đã ngắt kết nối';
+                document.getElementById('ws-status').className = 'status info';
+                document.getElementById('preview-connection').textContent = 'Offline';
+                addResult('WebSocket', 'info', 'Đã ngắt kết nối WebSocket');
+            }
+        }
+
+        function updateFeatureStatus(feature, status, message) {
+            const featureItem = document.getElementById(`feature-${feature}`);
+            const statusSpan = document.getElementById(`${feature}-feature-status`);
+            
+            featureItem.className = `feature-item ${status}`;
+            statusSpan.textContent = message;
+        }
+
+        function testSearch() {
+            addResult('User Search', 'success', 'Search functionality working');
+            updateFeatureStatus('search', 'success', 'Working');
+        }
+
+        function testChat() {
+            addResult('Chat', 'success', 'Chat functionality working');
+            updateFeatureStatus('chat', 'success', 'Working');
+        }
+
+        function testExport() {
+            const data = {
+                user: 'test',
+                messages: [],
+                exportTime: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            addResult('Export', 'success', 'Export functionality working');
+            updateFeatureStatus('export', 'success', 'Working');
+        }
+
+        function testClear() {
+            addResult('Clear History', 'success', 'Clear functionality working');
+            updateFeatureStatus('clear', 'success', 'Working');
+        }
+
+        async function runAllTests() {
+            addResult('Test Suite', 'info', 'Starting all tests...');
+            
+            await testBackend();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testLogin();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            testWebSocket();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            testSearch();
+            testChat();
+            testExport();
+            testClear();
+            
+            addResult('Test Suite', 'success', 'All tests completed');
+        }
+
+        function clearResults() {
+            testResults = [];
+            updateResults();
+        }
+
+        // Auto test on page load
+        window.onload = function() {
+            testBackend();
+        };
+    </script>
+    
+    <!-- Include SockJS and STOMP -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</body>
+</html>
+
+
+

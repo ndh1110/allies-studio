@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebSocket Connection</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .user-input {
+            margin: 20px 0;
+        }
+        .user-input select, .user-input input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .message.sent {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .message.received {
+            background-color: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Test WebSocket Connection</h1>
+        
+        <div id="status" class="status disconnected">
+            ❌ Chưa kết nối
+        </div>
+
+        <div class="user-input">
+            <label>Chọn user:</label>
+            <select id="userSelect">
+                <option value="user1">User 1 (user1)</option>
+                <option value="user2">User 2 (user2)</option>
+                <option value="user5">User 5 (user5)</option>
+                <option value="admin123">Admin (admin123)</option>
+            </select>
+            <button onclick="connectWebSocket()">🔌 Kết nối</button>
+            <button onclick="disconnectWebSocket()">🔌 Ngắt kết nối</button>
+        </div>
+
+        <div class="user-input">
+            <label>Tin nhắn test:</label>
+            <input type="text" id="messageInput" placeholder="Nhập tin nhắn test..." value="Hello from WebSocket test!">
+            <button onclick="sendTestMessage()" id="sendBtn" disabled>📤 Gửi tin nhắn</button>
+        </div>
+
+        <h3>📋 Log:</h3>
+        <div id="log" class="log"></div>
+
+        <h3>💬 Messages:</h3>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let isConnected = false;
+        let currentUser = 'user1';
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(status, className) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = status;
+            statusElement.className = `status ${className}`;
+        }
+
+        function updateUser() {
+            currentUser = document.getElementById('userSelect').value;
+            log(`User changed to: ${currentUser}`);
+        }
+
+        function connectWebSocket() {
+            if (isConnected) {
+                log('Already connected!');
+                return;
+            }
+
+            updateUser();
+            updateStatus('🔄 Đang kết nối...', 'connecting');
+            log(`Connecting to WebSocket as ${currentUser}...`);
+
+            try {
+                const socket = new SockJS('http://localhost:8080/ws');
+                stompClient = Stomp.over(socket);
+
+                stompClient.debug = (str) => {
+                    log(`STOMP: ${str}`);
+                };
+
+                stompClient.connect({}, (frame) => {
+                    log(`✅ Connected successfully! Frame: ${frame}`);
+                    isConnected = true;
+                    updateStatus(`✅ Đã kết nối (${currentUser})`, 'connected');
+                    document.getElementById('sendBtn').disabled = false;
+
+                    // Subscribe to public messages
+                    stompClient.subscribe('/topic/public', (message) => {
+                        try {
+                            const chatMessage = JSON.parse(message.body);
+                            log(`📨 Received public message: ${chatMessage.noiDung} from ${chatMessage.maTkA.tenDn}`);
+                            displayMessage(chatMessage, false);
+                        } catch (error) {
+                            log(`❌ Error parsing public message: ${error}`);
+                        }
+                    });
+
+                    // Subscribe to user-specific messages
+                    stompClient.subscribe(`/user/${currentUser}/queue/messages`, (message) => {
+                        try {
+                            const chatMessage = JSON.parse(message.body);
+                            log(`📨 Received private message: ${chatMessage.noiDung}`);
+                            displayMessage(chatMessage, false);
+                        } catch (error) {
+                            log(`❌ Error parsing private message: ${error}`);
+                        }
+                    });
+
+                }, (error) => {
+                    log(`❌ Connection failed: ${error}`);
+                    isConnected = false;
+                    updateStatus('❌ Kết nối thất bại', 'disconnected');
+                    document.getElementById('sendBtn').disabled = true;
+                });
+
+            } catch (error) {
+                log(`❌ Error creating WebSocket connection: ${error}`);
+                isConnected = false;
+                updateStatus('❌ Lỗi kết nối', 'disconnected');
+                document.getElementById('sendBtn').disabled = true;
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (stompClient && isConnected) {
+                stompClient.disconnect();
+                isConnected = false;
+                updateStatus('❌ Đã ngắt kết nối', 'disconnected');
+                document.getElementById('sendBtn').disabled = true;
+                log('🔌 Disconnected from WebSocket');
+            }
+        }
+
+        function sendTestMessage() {
+            if (!isConnected) {
+                alert('WebSocket chưa kết nối!');
+                return;
+            }
+
+            const messageText = document.getElementById('messageInput').value.trim();
+            if (!messageText) {
+                alert('Vui lòng nhập tin nhắn!');
+                return;
+            }
+
+            const chatMessage = {
+                noiDung: messageText,
+                maTkA: { id: 1, tenDn: currentUser },
+                maTkB: { id: 2, tenDn: 'user2' },
+                thoiGian: new Date().toISOString(),
+                trangThai: 'sent'
+            };
+
+            try {
+                stompClient.send('/app/chat.sendMessage', {}, JSON.stringify(chatMessage));
+                log(`📤 Sent message: ${messageText}`);
+                displayMessage(chatMessage, true);
+            } catch (error) {
+                log(`❌ Error sending message: ${error}`);
+            }
+        }
+
+        function displayMessage(message, isSent) {
+            const messagesContainer = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            
+            const time = new Date(message.thoiGian).toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <strong>${message.maTkA.tenDn}:</strong> ${message.noiDung}
+                <br><small>${time}</small>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Initialize
+        document.getElementById('userSelect').onchange = updateUser;
+        
+        log('🚀 WebSocket Test initialized');
+        log('📋 Instructions:');
+        log('1. Select a user');
+        log('2. Click "Kết nối" to connect');
+        log('3. Send a test message');
+        log('4. Open another tab to test real-time messaging');
+    </script>
+</body>
+</html>
+
+

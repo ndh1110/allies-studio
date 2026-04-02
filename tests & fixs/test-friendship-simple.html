@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Friendship - Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Test Friendship Creation - Simple</h2>
+        <p>Test tạo quan hệ bạn bè giữa user5 và admin123</p>
+        
+        <button onclick="createFriendship()">Tạo Quan Hệ user5 ↔ admin123</button>
+        <button onclick="checkAllFriends()">Kiểm Tra Tất Cả Bạn Bè</button>
+        <button onclick="listUsers()">Danh Sách User</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        async function createFriendship() {
+            try {
+                showResult('Đang tạo quan hệ bạn bè giữa user5 và admin123...', 'info');
+                
+                const response = await fetch('http://localhost:8080/api/test/create-friendship', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username1: 'user5',
+                        username2: 'admin123'
+                    })
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    showResult(`✅ QUAN HỆ BẠN BÈ TẠO THÀNH CÔNG!\n\n${responseText}`, 'success');
+                } else {
+                    showResult(`❌ LỖI TẠO QUAN HỆ!\nStatus: ${response.status}\nResponse: ${responseText}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult(`❌ LỖI MẠNG!\nError: ${error.message}\n\nHãy đảm bảo:\n1. Backend đang chạy trên port 8080\n2. Không có firewall chặn\n3. Thử mở Console (F12) để xem lỗi chi tiết`, 'error');
+            }
+        }
+        
+        async function checkAllFriends() {
+            try {
+                showResult('Đang kiểm tra bạn bè của user5 và admin123...', 'info');
+                
+                let result = '';
+                
+                // Check friends of user5
+                try {
+                    const response1 = await fetch('http://localhost:8080/api/test/friends/user5');
+                    const response1Text = await response1.text();
+                    result += `=== BẠN BÈ CỦA USER5 ===\n${response1Text}\n\n`;
+                } catch (e) {
+                    result += `Lỗi khi lấy bạn bè của user5: ${e.message}\n\n`;
+                }
+                
+                // Check friends of admin123
+                try {
+                    const response2 = await fetch('http://localhost:8080/api/test/friends/admin123');
+                    const response2Text = await response2.text();
+                    result += `=== BẠN BÈ CỦA ADMIN123 ===\n${response2Text}\n`;
+                } catch (e) {
+                    result += `Lỗi khi lấy bạn bè của admin123: ${e.message}\n`;
+                }
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ LỖI KIỂM TRA!\nError: ${error.message}`, 'error');
+            }
+        }
+        
+        async function listUsers() {
+            try {
+                showResult('Đang lấy danh sách user...', 'info');
+                
+                const response = await fetch('http://localhost:8080/api/test/users');
+                const users = await response.json();
+                
+                let result = '=== DANH SÁCH TẤT CẢ USER ===\n';
+                users.forEach(user => {
+                    result += `- ${user.tenDn} (ID: ${user.maTk})\n`;
+                });
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ LỖI LẤY DANH SÁCH!\nError: ${error.message}`, 'error');
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+        
+        // Auto-check backend on load
+        window.onload = function() {
+            listUsers();
+        };
+    </script>
+</body>
+</html>
+
+
