@@ -111,6 +111,45 @@ public class CallController {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // WebRTC Signaling relay endpoints
+    //
+    // These are intentionally THIN – they do nothing except forward payloads.
+    // All SDP / ICE negotiation happens entirely in the browsers (Angular).
+    // The backend is purely a message relay (signaling server) here.
+    //
+    // Expected payload shape (from Angular WebRtcService):
+    // {
+    //   "type"         : "offer" | "answer" | "candidate" | "call_end" | "call_busy"
+    //   "from"         : "senderUsername",
+    //   "to"           : "recipientUsername",
+    //   // offer / answer:
+    //   "sdp"          : "<sdp string>",
+    //   "sdpType"      : "offer" | "answer",
+    //   // ICE candidate:
+    //   "candidate"    : "<candidate string>",
+    //   "sdpMid"       : "<mid>",
+    //   "sdpMLineIndex": <number>
+    // }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Single relay endpoint for ALL WebRTC signaling messages.
+     * Angular sends to /app/webrtc.signal – Spring delivers to the recipient's
+     * /user/queue/call which the Angular WebSocketService already subscribes to.
+     */
+    @MessageMapping("/webrtc.signal")
+    public void relaySignal(@Payload Map<String, Object> signal) {
+        String to = (String) signal.get("to");
+        if (to == null || to.isBlank()) {
+            System.err.println("[WebRTC] relaySignal: missing 'to' field – dropping message.");
+            return;
+        }
+        String type = (String) signal.get("type");
+        System.out.printf("[WebRTC] Relaying '%s' signal → %s%n", type, to);
+        messagingTemplate.convertAndSendToUser(to, "/queue/call", signal);
+    }
+
     @MessageMapping("/call.end")
     public void endCall(@Payload Map<String, Object> endData) {
         try {

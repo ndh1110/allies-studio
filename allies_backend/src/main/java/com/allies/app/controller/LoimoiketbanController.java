@@ -1,6 +1,5 @@
 package com.allies.app.controller;
 
-import com.allies.app.model.Loimoiketban;
 import com.allies.app.model.Taikhoan;
 import com.allies.app.repository.TaikhoanRepository;
 import com.allies.app.service.LoimoiketbanService;
@@ -14,52 +13,55 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/loimoiketban")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 public class LoimoiketbanController {
 
   private final LoimoiketbanService service;
   private final TaikhoanRepository taikhoanRepository;
 
-  /** GỬI LỜI MỜI: body = { "senderId":1, "receiverId":2, "noiDung":"..."} */
+  /** GỬI LỜI MỜI */
   @PostMapping
-  public ResponseEntity<Loimoiketban> send(@RequestBody Map<String, Object> body) {
-    Integer senderId   = Integer.valueOf(body.get("senderId").toString());
+  public ResponseEntity<Map<String, Object>> send(@RequestBody Map<String, Object> body) {
+    Integer senderId = Integer.valueOf(body.get("senderId").toString());
     Integer receiverId = Integer.valueOf(body.get("receiverId").toString());
-    String noiDung     = (String) body.getOrDefault("noiDung", "");
-    return ResponseEntity.ok(service.sendFriendRequest(senderId, receiverId, noiDung)); // 
+    String noiDung = (String) body.getOrDefault("noiDung", "");
+
+    Map<String, Object> result = service.sendFriendRequest(senderId, receiverId, noiDung);
+    return ResponseEntity.ok(result);
   }
 
   /** DANH SÁCH LỜI MỜI ĐẾN (PENDING) theo userId */
   @GetMapping("/incoming")
-  public ResponseEntity<List<Loimoiketban>> incoming(@RequestParam("userId") Integer userId) {
-    return ResponseEntity.ok(service.getPendingRequests(userId)); // 
+  public ResponseEntity<List<Map<String, Object>>> incoming(@RequestParam("userId") Integer userId) {
+    return ResponseEntity.ok(service.getPendingRequests(userId));
   }
 
   /** DANH SÁCH LỜI MỜI ĐÃ GỬI của userId (dùng repo findByMaTkGui) */
   @GetMapping("/outgoing")
-  public ResponseEntity<List<Loimoiketban>> outgoing(@RequestParam("userId") Integer userId) {
+  public ResponseEntity<List<Map<String, Object>>> outgoing(@RequestParam("userId") Integer userId) {
     Taikhoan sender = taikhoanRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("Người gửi không tồn tại"));
-    // repo đã có findByMaTkGui(...) 
     return ResponseEntity.ok(service.getSentRequests(sender));
   }
 
   /** CHẤP NHẬN */
   @PostMapping("/{id}/accept")
-  public ResponseEntity<Loimoiketban> accept(@PathVariable Integer id) {
-    return ResponseEntity.ok(service.acceptFriendRequest(id)); // 
+  public ResponseEntity<Map<String, Object>> accept(@PathVariable Integer id) {
+    Map<String, Object> result = service.acceptFriendRequest(id);
+    return ResponseEntity.ok(result);
   }
 
   /** TỪ CHỐI */
   @PostMapping("/{id}/decline")
-  public ResponseEntity<Loimoiketban> decline(@PathVariable Integer id) {
-    return ResponseEntity.ok(service.rejectFriendRequest(id)); // 
+  public ResponseEntity<Map<String, Object>> decline(@PathVariable Integer id) {
+    Map<String, Object> result = service.rejectFriendRequest(id);
+
+    return ResponseEntity.ok(result);
   }
 
   /** HỦY (bên đã gửi) — thêm nhẹ trong service nếu chưa có */
   @PostMapping("/{id}/cancel")
   public ResponseEntity<Void> cancel(@PathVariable Integer id) {
-    service.cancelFriendRequest(id); // thêm method ngắn trong service, bên dưới
+    service.cancelFriendRequest(id);
     return ResponseEntity.ok().build();
   }
 }

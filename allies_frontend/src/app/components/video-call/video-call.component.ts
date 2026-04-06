@@ -1,78 +1,88 @@
-import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  Input,
+  signal,
+  computed,
+  effect,
+  ElementRef,
+  ViewChild,
+  NgZone,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { WebSocketService } from '../../services/websocket.service';
+import { Subscription } from 'rxjs';
+
+import { WebRtcService, CallState, SignalMessage } from '../../services/webrtc.service';
 import { AuthService } from '../../services/auth.service';
-import { Call, CallData, CallAnswer } from '../../models/call.model';
 
 @Component({
   selector: 'app-video-call',
   standalone: true,
   imports: [CommonModule],
   template: `
+    <!-- ════════════════════════════════════════════════════════════════════
+         ACTIVE CALL SCREEN
+         Shown when callState is 'calling' | 'connecting' | 'connected'
+    ═══════════════════════════════════════════════════════════════════════ -->
     <div class="fixed inset-0 bg-black z-50" *ngIf="isCallActive()">
       <div class="flex h-full">
-        <!-- Video Area -->
-        <div class="flex-1 relative">
+
+        <!-- ── VIDEO CALL layout ──────────────────────────────────────────── -->
+        <div [class.hidden]="!isVideoCall()" class="flex-1 relative w-full h-full">
           <!-- Remote Video -->
-          <video
-            #remoteVideo
-            class="w-full h-full object-cover"
-            autoplay
-            playsinline
-          ></video>
-          
-          <!-- Local Video -->
+          <video #remoteVideo class="w-full h-full object-cover"
+            autoplay playsinline></video>
+
+          <!-- Local Video PIP -->
           <div class="absolute top-4 right-4 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden">
-            <video
-              #localVideo
-              class="w-full h-full object-cover"
-              autoplay
-              playsinline
-              muted
-            ></video>
+            <video #localVideo class="w-full h-full object-cover"
+              autoplay playsinline muted></video>
           </div>
-          
-          <!-- Call Info -->
+
+          <!-- Peer name + duration overlay -->
           <div class="absolute top-4 left-4 text-white">
-            <h3 class="text-xl font-semibold">{{ callInfo()?.callerId || 'Calling...' }}</h3>
+            <h3 class="text-xl font-semibold">{{ remotePeerName() || 'Calling...' }}</h3>
             <p class="text-sm opacity-75">{{ getCallDuration() }}</p>
           </div>
         </div>
-        
-        <!-- Controls -->
+
+        <!-- ── VOICE CALL layout ──────────────────────────────────────────── -->
+        <div [class.hidden]="isVideoCall()" class="voice-call-screen">
+          <div class="voice-avatar-ring">
+            <div class="voice-avatar">
+              {{ (remotePeerName() || '?').slice(0, 2).toUpperCase() }}
+            </div>
+          </div>
+          <h2 class="voice-peer-name">{{ remotePeerName() || 'Calling...' }}</h2>
+          <p class="voice-status">{{ getCallDuration() || 'Connecting...' }}</p>
+        </div>
+
+        <!-- ── Controls (shared by both layouts) ─────────────────────────── -->
         <div class="absolute bottom-8 left-half transform translate-x-negative-half flex space-x-4">
-          <!-- Mute Button -->
-          <button
-            (click)="toggleMute()"
+          <!-- Mute -->
+          <button (click)="toggleMute()"
             class="w-12 h-12 rounded-full flex items-center justify-center"
             [class.bg-gray-600]="!isMuted()"
-            [class.bg-red-600]="isMuted()"
-          >
-            <span class="material-icons text-white">
-              {{ isMuted() ? 'mic_off' : 'mic' }}
-            </span>
+            [class.bg-red-600]="isMuted()">
+            <span class="material-icons text-white">{{ isMuted() ? 'mic_off' : 'mic' }}</span>
           </button>
-          
-          <!-- Video Toggle -->
-          <button
-            (click)="toggleVideo()"
+
+          <!-- Video toggle — only shown for video calls -->
+          <button *ngIf="isVideoCall()" (click)="toggleVideo()"
             class="w-12 h-12 rounded-full flex items-center justify-center"
             [class.bg-gray-600]="!isVideoOff()"
-            [class.bg-red-600]="isVideoOff()"
-          >
-            <span class="material-icons text-white">
-              {{ isVideoOff() ? 'videocam_off' : 'videocam' }}
-            </span>
+            [class.bg-red-600]="isVideoOff()">
+            <span class="material-icons text-white">{{ isVideoOff() ? 'videocam_off' : 'videocam' }}</span>
           </button>
-          
+
           <!-- End Call -->
-          <button
-            (click)="endCall()"
-            class="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center"
-          >
+          <button (click)="endCall()"
+            class="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center">
             <span class="material-icons text-white">call_end</span>
           </button>
         </div>
+
       </div>
     </div>
     
@@ -81,23 +91,24 @@ import { Call, CallData, CallAnswer } from '../../models/call.model';
       <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
         <div class="text-center">
           <div class="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <span class="material-icons text-white text-3xl">person</span>
+            <!-- Show camera icon for video, phone icon for voice -->
+            <span class="material-icons text-white text-3xl">
+              {{ isVideoCall() ? 'videocam' : 'phone' }}
+            </span>
           </div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Incoming Call</h3>
-          <p class="text-gray-600 mb-6">{{ incomingCall()?.callerId }}</p>
-          
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">
+            Incoming {{ isVideoCall() ? 'Video' : 'Voice' }} Call
+          </h3>
+          <p class="text-gray-600 mb-6">{{ incomingCall()?.from }}</p>
+
           <div class="flex space-x-4 justify-center">
-            <button
-              (click)="answerCall(false)"
-              class="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center"
-            >
+            <button (click)="answerCall(false)"
+              class="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center">
               <span class="material-icons text-white">call_end</span>
             </button>
-            <button
-              (click)="answerCall(true)"
-              class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center"
-            >
-              <span class="material-icons text-white">call</span>
+            <button (click)="answerCall(true)"
+              class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center">
+              <span class="material-icons text-white">{{ isVideoCall() ? 'videocam' : 'call' }}</span>
             </button>
           </div>
         </div>
@@ -125,6 +136,10 @@ import { Call, CallData, CallAnswer } from '../../models/call.model';
     </div>
   `,
   styles: [`
+    .hidden {
+      display: none !important;
+    }
+
     .fixed {
       position: fixed;
     }
@@ -365,174 +380,287 @@ import { Call, CallData, CallAnswer } from '../../models/call.model';
       cursor: pointer;
     }
     
+    /* ── Voice call screen ───────────────────────────────────────────────────── */
+    .voice-call-screen {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+      gap: 1.5rem;
+    }
+    .voice-avatar-ring {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: rgba(99, 88, 247, 0.2);
+      display: flex; align-items: center; justify-content: center;
+      animation: voice-pulse 2s ease-in-out infinite;
+    }
+    .voice-avatar {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: #4f46e5; color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 800;
+      letter-spacing: 1px;
+    }
+    .voice-peer-name {
+      color: white; font-size: 1.75rem; font-weight: 700;
+      margin: 0; letter-spacing: 0.5px;
+    }
+    .voice-status {
+      color: rgba(255,255,255,0.65); font-size: 0.95rem; margin: 0;
+    }
+    @keyframes voice-pulse {
+      0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(99,88,247,0.5); }
+      50%       { transform: scale(1.06); box-shadow: 0 0 0 20px rgba(99,88,247,0); }
+    }
+
     .hover\\:bg-gray-50:hover {
       background-color: var(--gray-50);
     }
   `]
 })
 export class VideoCallComponent implements OnInit, OnDestroy {
-  @ViewChild('localVideo') localVideo!: ElementRef<HTMLVideoElement>;
-  @ViewChild('remoteVideo') remoteVideo!: ElementRef<HTMLVideoElement>;
 
+  // ── Input: the username of the person we're chatting with (for outgoing calls).
+  // Set this from the parent component that embeds <app-video-call>.
+  @Input() targetUsername: string = '';
+
+  @ViewChild('localVideo') localVideoRef!: ElementRef<HTMLVideoElement>;
+  @ViewChild('remoteVideo') remoteVideoRef!: ElementRef<HTMLVideoElement>;
+
+  // ── UI state signals ────────────────────────────────────────────────────────
   isCallActive = signal(false);
   isMuted = signal(false);
   isVideoOff = signal(false);
-  incomingCall = signal<any>(null);
-  callInfo = signal<CallData | null>(null);
-  callStartTime = signal<Date | null>(null);
-  
-  private localStream: MediaStream | null = null;
-  private remoteStream: MediaStream | null = null;
-  private peerConnection: RTCPeerConnection | null = null;
+  /** Whether this is a video or voice-only call (affects UI rendering) */
+  isVideoCall = signal(true);
+  /** Holds the pending SignalMessage when callState is 'receiving' */
+  incomingCall = signal<SignalMessage | null>(null);
+  /** Name shown in the top-left during an active call */
+  remotePeerName = signal<string | null>(null);
+
+  private callStartTime: Date | null = null;
+  private durationInterval: ReturnType<typeof setInterval> | null = null;
+  private subs: Subscription[] = [];
 
   constructor(
-    private webSocketService: WebSocketService,
-    private authService: AuthService
-  ) {}
+    private webRtcService: WebRtcService,
+    private authService: AuthService,
+    private ngZone: NgZone,
+  ) { }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Lifecycle
+  // ════════════════════════════════════════════════════════════════════════════
 
   ngOnInit(): void {
-    this.subscribeToCallEvents();
+    // Tell the service who we are so it can fill in SignalMessage.from correctly.
+    const me = this.authService.getCurrentUser();
+    if (me?.username) {
+      this.webRtcService.setMyUsername(me.username);
+    }
+
+    // ── Subscribe to call state ──────────────────────────────────────────────
+    this.subs.push(
+      this.webRtcService.callState$.subscribe((state: CallState) => {
+        this.ngZone.run(() => this._onCallStateChange(state));
+      })
+    );
+
+    // ── Subscribe to local stream → wire to <video #localVideo> ────────────
+    this.subs.push(
+      this.webRtcService.localStream$.subscribe((stream) => {
+        this.ngZone.run(() => {
+          if (this.localVideoRef?.nativeElement) {
+            this.localVideoRef.nativeElement.srcObject = stream;
+            this.localVideoRef.nativeElement.muted = true;
+          }
+        });
+      })
+    );
+
+    // ── Subscribe to remote stream → wire to <video #remoteVideo> ──────────
+    this.subs.push(
+      this.webRtcService.remoteStream$.subscribe((stream) => {
+        this.ngZone.run(() => {
+          if (this.remoteVideoRef?.nativeElement) {
+            this.remoteVideoRef.nativeElement.srcObject = stream;
+          }
+        });
+      })
+    );
+
+    // ── Track who the remote peer is ────────────────────────────────────────
+    this.subs.push(
+      this.webRtcService.remotePeer$.subscribe((peer) => {
+        this.ngZone.run(() => this.remotePeerName.set(peer));
+      })
+    );
+
+    // ── Track if this is a video or voice call ──────────────────────────────
+    this.subs.push(
+      this.webRtcService.isVideoCall$.subscribe((isVideo) => {
+        this.ngZone.run(() => this.isVideoCall.set(isVideo));
+      })
+    );
   }
 
   ngOnDestroy(): void {
-    this.endCall();
+    this.subs.forEach((s) => s.unsubscribe());
+    this._stopDurationClock();
+    // Do NOT call hangUp() here automatically — the service manages its own
+    // lifecycle and will keep the call alive if this component is destroyed
+    // while a call is active (e.g. route change). Call hangUp() explicitly.
   }
 
-  subscribeToCallEvents(): void {
-    this.webSocketService.callEvents$.subscribe(event => {
-      if (event) {
-        switch (event.type) {
-          case 'incoming_call':
-            this.incomingCall.set(event);
-            break;
-          case 'call_accepted':
-            this.startCall();
-            break;
-          case 'call_rejected':
-            this.endCall();
-            break;
-          case 'call_ended':
-            this.endCall();
-            break;
-        }
-      }
-    });
-  }
+  // ════════════════════════════════════════════════════════════════════════════
+  // Template-facing methods
+  // ════════════════════════════════════════════════════════════════════════════
 
+  /** Called by the "Video Call" button in the chat header. */
   startVideoCall(): void {
-    const currentUser = this.authService.getCurrentUser();
-    if (!currentUser) return;
-
-    const callData: CallData = {
-      callerId: currentUser.username,
-      receiverId: 'receiver', // This should come from the selected chat
-      callType: 'video'
-    };
-
-    this.callInfo.set(callData);
-    this.webSocketService.initiateCall(callData);
+    if (!this.targetUsername) {
+      console.warn('[VideoCall] targetUsername is not set — cannot start call.');
+      return;
+    }
+    this.webRtcService.startCall(this.targetUsername);
   }
 
+  /** Voice call: WebRTC flow with getUserMedia audio-only. */
   startVoiceCall(): void {
-    const currentUser = this.authService.getCurrentUser();
-    if (!currentUser) return;
-
-    const callData: CallData = {
-      callerId: currentUser.username,
-      receiverId: 'receiver', // This should come from the selected chat
-      callType: 'voice'
-    };
-
-    this.callInfo.set(callData);
-    this.webSocketService.initiateCall(callData);
-  }
-
-  async startCall(): Promise<void> {
-    try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      
-      if (this.localVideo) {
-        this.localVideo.nativeElement.srcObject = this.localStream;
-      }
-      
-      this.isCallActive.set(true);
-      this.callStartTime.set(new Date());
-      this.incomingCall.set(null);
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
+    if (!this.targetUsername) {
+      console.warn('[VideoCall] targetUsername is not set — cannot start voice call.');
+      return;
     }
+    this.webRtcService.startCall(this.targetUsername, false);
   }
 
+  /** Called by Accept (true) / Decline (false) buttons in the incoming modal. */
   answerCall(accept: boolean): void {
-    if (!this.incomingCall()) return;
+    const offer = this.webRtcService.getPendingOffer();
+    if (!offer) return;
 
-    const answer: CallAnswer = {
-      callId: this.incomingCall().callId,
-      answer: accept ? 'accept' : 'reject'
-    };
-
-    this.webSocketService.answerCall(answer);
-    
     if (accept) {
-      this.startCall();
+      this.webRtcService.acceptCall(offer);
     } else {
-      this.incomingCall.set(null);
+      this.webRtcService.declineCall(offer.from);
     }
-  }
-
-  endCall(): void {
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop());
-      this.localStream = null;
-    }
-
-    if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach(track => track.stop());
-      this.remoteStream = null;
-    }
-
-    if (this.peerConnection) {
-      this.peerConnection.close();
-      this.peerConnection = null;
-    }
-
-    this.isCallActive.set(false);
     this.incomingCall.set(null);
-    this.callInfo.set(null);
-    this.callStartTime.set(null);
   }
 
+  /** End Call button. */
+  endCall(): void {
+    this.webRtcService.hangUp();
+  }
+
+  /** Mute / unmute the local audio track directly on the MediaStream. */
   toggleMute(): void {
-    if (this.localStream) {
-      const audioTrack = this.localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        this.isMuted.set(!audioTrack.enabled);
-      }
+    const stream = this.webRtcService.localStream$.value;
+    if (!stream) return;
+    const audioTrack = stream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      this.isMuted.set(!audioTrack.enabled);
     }
   }
 
+  /** Enable / disable the local video track directly on the MediaStream. */
   toggleVideo(): void {
-    if (this.localStream) {
-      const videoTrack = this.localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        this.isVideoOff.set(!videoTrack.enabled);
-      }
+    const stream = this.webRtcService.localStream$.value;
+    if (!stream) return;
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      this.isVideoOff.set(!videoTrack.enabled);
     }
   }
 
-  getCallDuration(): string {
-    if (!this.callStartTime()) return '00:00';
-    
-    const now = new Date();
-    const duration = Math.floor((now.getTime() - this.callStartTime()!.getTime()) / 1000);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  /** Returns a "MM:SS" duration string while the call is connected. */
+  getCallDuration(): string | null {
+    if (!this.callStartTime) return null;
+    const elapsed = Math.floor((Date.now() - this.callStartTime.getTime()) / 1000);
+    const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const s = (elapsed % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Private helpers
+  // ════════════════════════════════════════════════════════════════════════════
+
+  private _onCallStateChange(state: CallState): void {
+    switch (state) {
+
+      case 'calling':
+        // We placed a call — show the active call screen immediately so the
+        // user gets feedback, even before ICE completes.
+        this.isCallActive.set(true);
+        this.incomingCall.set(null);
+        break;
+
+      case 'receiving':
+        // Someone is calling us — show the incoming call modal.
+        this.incomingCall.set(this.webRtcService.getPendingOffer());
+        this.isCallActive.set(false);
+        break;
+
+      case 'connecting':
+        // SDP negotiation in progress — keep the active screen visible.
+        this.isCallActive.set(true);
+        this.incomingCall.set(null);
+        break;
+
+      case 'connected':
+        // Media is flowing — start the duration clock.
+        this.isCallActive.set(true);
+        this.incomingCall.set(null);
+        this._startDurationClock();
+
+        setTimeout(() => {
+          if (this.localVideoRef?.nativeElement) {
+            const stream = (this.webRtcService as any).localStream$?.value;
+            if (stream) {
+              this.localVideoRef.nativeElement.srcObject = stream;
+              this.localVideoRef.nativeElement.muted = true;
+            }
+          }
+          if (this.remoteVideoRef?.nativeElement) {
+            const stream = (this.webRtcService as any).remoteStream$?.value;
+            if (stream) {
+              this.remoteVideoRef.nativeElement.srcObject = stream;
+            }
+          }
+        }, 150);
+        break;
+
+      case 'ended':
+      case 'idle':
+        // Call finished — reset all UI state.
+        this.isCallActive.set(false);
+        this.incomingCall.set(null);
+        this.isMuted.set(false);
+        this.isVideoOff.set(false);
+        this._stopDurationClock();
+        // Clear video elements
+        if (this.localVideoRef?.nativeElement) this.localVideoRef.nativeElement.srcObject = null;
+        if (this.remoteVideoRef?.nativeElement) this.remoteVideoRef.nativeElement.srcObject = null;
+        break;
+    }
+  }
+
+  private _startDurationClock(): void {
+    this._stopDurationClock();
+    this.callStartTime = new Date();
+    // Tick every second so getCallDuration() re-evaluates.
+    // We use a simple interval + change detection via NgZone.
+    this.durationInterval = setInterval(() => {
+      this.ngZone.run(() => { /* trigger CD */ });
+    }, 1000);
+  }
+
+  private _stopDurationClock(): void {
+    if (this.durationInterval !== null) {
+      clearInterval(this.durationInterval);
+      this.durationInterval = null;
+    }
+    this.callStartTime = null;
   }
 }

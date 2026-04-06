@@ -12,14 +12,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
+// @CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class UserController {
 
     private final TaikhoanRepository tkRepo;
 
     @GetMapping("/search")
     public List<UserLiteDto> search(@RequestParam("q") String q, Principal me) {
-        if (q == null || (q = q.trim()).length() < 2) return List.of(); // gõ ≥2 ký tự mới trả
+        if (q == null || (q = q.trim()).length() < 2)
+            return List.of(); // gõ ≥2 ký tự mới trả
         // lấy id người đang đăng nhập từ Principal (username = tenDn)
         Taikhoan mine = tkRepo.findByTenDn(me.getName())
                 .orElseThrow(() -> new RuntimeException("Current user not found"));

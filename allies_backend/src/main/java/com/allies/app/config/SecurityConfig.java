@@ -46,8 +46,10 @@ public class SecurityConfig {
   }
 
   /**
-   * Dùng UserDetailsService từ TaikhoanService (@Service implements UserDetailsService).
-   * Ở version Spring Security của bạn, DaoAuthenticationProvider CHƯA có ctor (uds, encoder),
+   * Dùng UserDetailsService từ TaikhoanService (@Service implements
+   * UserDetailsService).
+   * Ở version Spring Security của bạn, DaoAuthenticationProvider CHƯA có ctor
+   * (uds, encoder),
    * vì vậy dùng setter (deprecated ở bản mới) và tắt warning.
    */
   @Bean
@@ -68,14 +70,15 @@ public class SecurityConfig {
 
   /**
    * Tùy chữ ký constructor của JwtAuthTokenFilter:
-   *  - Nếu filter của bạn là (JwtUtils, TaikhoanService) => dùng UserDetailsService uds như dưới vẫn OK
-   *    miễn TaikhoanService implements UserDetailsService.
-   *  - Nếu nó nhận đúng (JwtUtils, UserDetailsService) thì càng khớp.
+   * - Nếu filter của bạn là (JwtUtils, TaikhoanService) => dùng
+   * UserDetailsService uds như dưới vẫn OK
+   * miễn TaikhoanService implements UserDetailsService.
+   * - Nếu nó nhận đúng (JwtUtils, UserDetailsService) thì càng khớp.
    */
   @Bean
-public JwtAuthTokenFilter jwtAuthTokenFilter(JwtUtils jwtUtils, TaikhoanService taikhoanService) {
+  public JwtAuthTokenFilter jwtAuthTokenFilter(JwtUtils jwtUtils, TaikhoanService taikhoanService) {
     return new JwtAuthTokenFilter(jwtUtils, taikhoanService);
-}
+  }
 
   // ===== Security chain =====
   @Bean
@@ -85,35 +88,54 @@ public JwtAuthTokenFilter jwtAuthTokenFilter(JwtUtils jwtUtils, TaikhoanService 
       JwtAuthTokenFilter jwtAuthTokenFilter) throws Exception {
 
     http
-      .csrf(csrf -> csrf.disable())
-      .cors(Customizer.withDefaults())
-      .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-      .authorizeHttpRequests(auth -> auth
-        // public endpoints
-        .requestMatchers("/api/auth/**", "/api/test/**", "/ws/**").permitAll()
-        // protected endpoints
-        .requestMatchers("/api/users/search").authenticated()
-        .requestMatchers("/api/loimoiketban/**").authenticated()
-        // những API còn lại yêu cầu login
-        .anyRequest().authenticated()
-      )
-      .authenticationProvider(daoProvider)
-      .addFilterBefore(jwtAuthTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        .csrf(csrf -> csrf.disable())
+        .cors(Customizer.withDefaults())
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(auth -> auth
+            // public endpoints
+            .requestMatchers("/api/auth/**", "/api/test/**", "/ws/**").permitAll()
+            // protected endpoints
+            .requestMatchers("/api/users/search/**").authenticated()
+            .requestMatchers("/api/loimoiketban", "/api/loimoiketban/**").authenticated()
+            .requestMatchers("/api/quanhe/**").authenticated()
+            .requestMatchers("/api/groups/**").authenticated()
+            .requestMatchers("/api/chat/**").authenticated()
+            // default
+            .anyRequest().authenticated())
+        .authenticationProvider(daoProvider)
+        .addFilterBefore(jwtAuthTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
 
   // ===== CORS (localhost + ngrok) =====
+  // @Bean
+  // public CorsConfigurationSource corsConfigurationSource() {
+  // CorsConfiguration cfg = new CorsConfiguration();
+  // cfg.setAllowCredentials(true);
+  // cfg.setAllowedOriginPatterns(List.of(
+  // "http://localhost:4200",
+  // "https://*.ngrok-free.dev",
+  // "https://*.ngrok.io"
+  // ));
+  // cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+  // cfg.setAllowedHeaders(List.of("*"));
+  // cfg.setExposedHeaders(List.of("Authorization"));
+
+  // UrlBasedCorsConfigurationSource source = new
+  // UrlBasedCorsConfigurationSource();
+  // source.registerCorsConfiguration("/**", cfg);
+  // return source;
+  // }
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration cfg = new CorsConfiguration();
     cfg.setAllowCredentials(true);
-    cfg.setAllowedOriginPatterns(List.of(
-      "http://localhost:4200",
-      "https://*.ngrok-free.dev",
-      "https://*.ngrok.io"
-    ));
-    cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+
+    // Đổi thành dấu * để nhận mọi IP khi test LAN
+    cfg.setAllowedOriginPatterns(List.of("*"));
+
+    cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
     cfg.setAllowedHeaders(List.of("*"));
     cfg.setExposedHeaders(List.of("Authorization"));
 

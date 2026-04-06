@@ -67,22 +67,30 @@ export class AddFriendsService {
   // ================== FRIEND REQUESTS ==================
   /** Gửi lời mời kết bạn */
   sendRequest(toUserId: number | string) {
+    const senderId = localStorage.getItem('userId');
+    const body = {
+      senderId: Number(senderId),
+      receiverId: Number(toUserId),
+      noiDung: "Hello, I would like to be friends!"
+    };
     return firstValueFrom(
-      this.http.post(`${this.base}/loimoiketban`, { toUserId }, { headers: this.headers() })
+      this.http.post(`${this.base}/loimoiketban`, body, { headers: this.headers() })
     );
   }
 
   /** Lời mời đến */
   getIncoming() {
+    const userId = localStorage.getItem('userId') || '';
     return firstValueFrom(
-      this.http.get<FriendRequest[]>(`${this.base}/loimoiketban/incoming`, { headers: this.headers() })
+      this.http.get<FriendRequest[]>(`${this.base}/loimoiketban/incoming`, { params: { userId }, headers: this.headers() })
     );
   }
 
   /** Lời mời đã gửi */
   getOutgoing() {
+    const userId = localStorage.getItem('userId') || '';
     return firstValueFrom(
-      this.http.get<FriendRequest[]>(`${this.base}/loimoiketban/outgoing`, { headers: this.headers() })
+      this.http.get<FriendRequest[]>(`${this.base}/loimoiketban/outgoing`, { params: { userId }, headers: this.headers() })
     );
   }
 
@@ -112,6 +120,21 @@ export class AddFriendsService {
   getSuggestions() {
     return firstValueFrom(
       this.http.get<UserLite[]>(`${this.base}/loimoiketban/suggestions`, { headers: this.headers() })
+    );
+  }
+
+  // ================== FRIENDS / QUANHE ==================
+  getFriends() {
+    const userId = localStorage.getItem('userId') || '';
+    return firstValueFrom(
+      this.http.get<any[]>(`${this.base}/quanhe/${userId}`, { headers: this.headers() })
+    );
+  }
+
+  unfriend(friendId: number | string) {
+    const userId = localStorage.getItem('userId') || '';
+    return firstValueFrom(
+      this.http.delete(`${this.base}/quanhe/${userId}/${friendId}`, { headers: this.headers() })
     );
   }
 }

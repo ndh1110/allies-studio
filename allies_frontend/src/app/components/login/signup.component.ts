@@ -80,7 +80,7 @@ export class SignupComponent {
       },
       error: (err) => {
         this._loading.set(false);
-        const msg = err?.error?.message || 'Sign up failed. Please try again.';
+        const msg = (typeof err?.error === 'string') ? err.error : (err?.error?.message || 'Sign up failed. Please try again.');
         this._error.set(msg);
       }
     });
